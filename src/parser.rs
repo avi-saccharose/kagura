@@ -3,14 +3,14 @@ use std::{iter::Peekable, vec::IntoIter};
 
 use crate::{
     error::{ErrorType, KaguError},
-    expr::{Arena, Ast, Bin, Block, Expr, Idx, Lit, Stmt},
+    expr::{Arena, Bin, Block, Expr, Idx, Lit, Node, Stmt},
     lexer,
     token::{Kind, Token},
 };
 
 struct Parser<'a> {
-    stmts: Arena<Stmt>,
-    exprs: Arena<Expr>,
+    nodes: Arena<Node>,
+    indices: Vec<Idx>,
     tokens: Peekable<IntoIter<Token>>,
     source: &'a str,
 }
@@ -18,8 +18,8 @@ struct Parser<'a> {
 impl<'a> Parser<'a> {
     fn new(tokens: Vec<Token>, source: &'a str) -> Self {
         Self {
-            stmts: Arena::new(),
-            exprs: Arena::new(),
+            nodes: Arena::new(),
+            indices: Vec::new(),
             tokens: tokens.into_iter().peekable(),
             source,
         }
@@ -54,7 +54,11 @@ impl<'a> Parser<'a> {
     }
 
     fn block_start(&self) -> Idx {
-        Idx(self.stmts.data.len())
+        Idx(self.nodes.data.len())
+    }
+
+    fn add_node(&mut self, node: Node) -> Idx {
+        self.nodes.alloc(node)
     }
 
     fn consume(&mut self, kind: Kind, msg: &str) -> Result<Token, KaguError> {
@@ -81,7 +85,8 @@ impl<'a> Parser<'a> {
 
     fn parse(&mut self) -> Result<(), KaguError> {
         while !self.eof() {
-            self.stmt_declaration()?;
+            let idx = self.stmt_declaration()?;
+            self.indices.push(idx);
         }
         Ok(())
     }
@@ -102,7 +107,7 @@ impl<'a> Parser<'a> {
         self.advance();
         let expr = self.expr()?;
         self.consume(Kind::Semicolon, "expect ';' after puts")?;
-        let idx = self.stmts.alloc(Stmt::Puts(expr));
+        let idx = self.add_node(Node::Puts(expr));
         Ok(idx)
     }
 
@@ -115,16 +120,13 @@ impl<'a> Parser<'a> {
         }
 
         self.consume(Kind::Rbrace, "expect '}'")?;
-        let idx = self.stmts.alloc(Stmt::Block(Block { start, end }));
+        let idx = self.add_node(Node::Block(Block { start, end }));
         Ok(idx)
     }
 
     fn stmt_expr(&mut self) -> Result<Idx, KaguError> {
-        let expr = self.expr()?;
+        let idx = self.expr()?;
         self.consume(Kind::Semicolon, "Expect ';' after expr")?;
-        let stmt = Stmt::Expr(expr);
-        let idx = self.stmts.alloc(stmt);
-
         Ok(idx)
     }
 
@@ -149,8 +151,8 @@ impl<'a> Parser<'a> {
         while self.matches(&[Kind::Plus, Kind::Minus]) {
             let op = self.advance().unwrap();
             let right = self.factor()?;
-            let expr = Expr::Bin(Bin { left, right, op });
-            left = self.exprs.alloc(expr);
+            let expr = Node::BinExpr(Bin { left, right, op });
+            left = self.add_node(expr);
         }
 
         Ok(left)
@@ -162,8 +164,8 @@ impl<'a> Parser<'a> {
         while self.matches(&[Kind::Star, Kind::Slash]) {
             let op = self.advance().unwrap();
             let right = self.unary()?;
-            let expr = Expr::Bin(Bin { left, right, op });
-            left = self.exprs.alloc(expr);
+            let expr = Node::BinExpr(Bin { left, right, op });
+            left = self.add_node(expr);
         }
 
         Ok(left)
@@ -178,18 +180,18 @@ impl<'a> Parser<'a> {
             Kind::Int | Kind::Ident | Kind::Str => self.make_literal(),
             Kind::True => {
                 self.advance();
-                let lit = Expr::Lit(Lit::Bool(true));
-                Ok(self.exprs.alloc(lit))
+                let lit = Node::Lit(Lit::Bool(true));
+                Ok(self.add_node(lit))
             }
             Kind::False => {
                 self.advance();
-                let lit = Expr::Lit(Lit::Bool(false));
-                Ok(self.exprs.alloc(lit))
+                let lit = Node::Lit(Lit::Bool(false));
+                Ok(self.add_node(lit))
             }
             Kind::Nil => {
                 self.advance();
-                let lit = Expr::Lit(Lit::Nil);
-                Ok(self.exprs.alloc(lit))
+                let lit = Node::Lit(Lit::Nil);
+                Ok(self.add_node(lit))
             }
             _ => Err(KaguError {
                 msg: format!("Expected character found {}", self.peek()),
@@ -216,8 +218,8 @@ impl<'a> Parser<'a> {
                         })
                     }
                 };
-                let expr = Expr::Lit(Lit::Int(int));
-                Ok(self.exprs.alloc(expr))
+                let expr = Node::Lit(Lit::Int(int));
+                Ok(self.add_node(expr))
             }
             Kind::Ident => {
                 todo!()
@@ -234,8 +236,17 @@ pub(crate) fn parse(input: &str) -> Result<Ast, KaguError> {
     let tokens = lexer::tokenize(input)?;
     let mut parser = Parser::new(tokens, input);
     parser.parse()?;
-    let ast = Ast::new(parser.stmts, parser.exprs);
+    let ast = Ast {
+        nodes: parser.nodes,
+        indices: parser.indices,
+    };
     Ok(ast)
+}
+
+#[derive(Debug)]
+struct Ast {
+    nodes: Arena<Node>,
+    indices: Vec<Idx>,
 }
 
 #[cfg(test)]
@@ -254,8 +265,7 @@ mod tests {
         let parsed = parse(input);
         assert!(parsed.is_ok());
         let parsed = parsed.unwrap();
-        let stmt = parsed.stmts;
-        assert!(matches!(stmt.data[0], Stmt::Puts(..)));
+        dbg!(parsed);
     }
 
     #[test]

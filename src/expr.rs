@@ -27,9 +27,19 @@ impl<T> Arena<T> {
     }
 }
 
+// TODO: combine both statements and expressions into a single enum to use a single ast
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum Stmt {
     Expr(Idx),
+    Puts(Idx),
+    Block(Block),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) enum Node {
+    BinExpr(Bin),
+    Unary(Unary),
+    Lit(Lit),
     Puts(Idx),
     Block(Block),
 }
