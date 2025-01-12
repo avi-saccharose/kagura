@@ -11,6 +11,7 @@ pub(crate) enum Kind {
     NtEq, // !=
     EqEq, // ==
 
+    Eq,        // =
     Star,      // *
     Plus,      // +
     Minus,     // -
@@ -26,6 +27,8 @@ pub(crate) enum Kind {
     Ampersand, // &
     At,        // @
     Bang,      // !
+    Semicolon, // ;
+    Colon,     // :
 
     And,
     Or,
@@ -40,6 +43,7 @@ pub(crate) enum Kind {
     Then,
     Do,
     End,
+    Var,
 
     True,
     False,
@@ -56,11 +60,12 @@ pub(crate) enum Kind {
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub(crate) struct Token {
     pub(crate) kind: Kind,
+    pub(crate) line: usize,
     pub(crate) span: Span<usize>,
 }
 
 impl Token {
-    fn text<'a>(&self, input: &'a str) -> &'a str {
+    pub(crate) fn text<'a>(&self, input: &'a str) -> &'a str {
         &input[self.span]
     }
 }
@@ -103,6 +108,7 @@ impl fmt::Display for Kind {
             Self::NtEq => "!=",
             Self::EqEq => "==",
 
+            Self::Eq => "=",
             Self::Star => "*",
             Self::Plus => "+",
             Self::Minus => "-",
@@ -118,9 +124,11 @@ impl fmt::Display for Kind {
             Self::Ampersand => "&",
             Self::At => "@",
             Self::Bang => "!",
+            Self::Semicolon => ";",
+            Self::Colon => ":",
 
-            Self::And => "&&",
-            Self::Or => "||",
+            Self::And => "and",
+            Self::Or => "or",
 
             Self::If => "if",
             Self::Else => "else",
@@ -133,6 +141,7 @@ impl fmt::Display for Kind {
             Self::Do => "do",
             Self::End => "end",
 
+            Self::Var => "var",
             Self::True => "true",
             Self::False => "false",
             Self::Nil => "nil",
@@ -163,6 +172,7 @@ mod tests {
         let text = "while";
         let token = Token {
             kind: Kind::While,
+            line: 0,
             span: Span { start: 0, end: 5 },
         };
         assert_eq!(token.text(text), "while");
