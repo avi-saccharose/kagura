@@ -1,13 +1,20 @@
 use core::fmt;
 use std::error::Error;
 
-use crate::token::Token;
-
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) struct KaguError {
     pub(crate) msg: String,
     pub(crate) line: usize,
     pub(crate) start: usize,
+    pub(crate) error_type: ErrorType,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub(crate) enum ErrorType {
+    Lexer,
+    Parse,
+    Runtime,
+    ParseEof,
 }
 
 impl Error for KaguError {}

@@ -44,6 +44,7 @@ pub(crate) enum Kind {
     Do,
     End,
     Var,
+    Puts,
 
     True,
     False,
@@ -140,6 +141,7 @@ impl fmt::Display for Kind {
             Self::Then => "then",
             Self::Do => "do",
             Self::End => "end",
+            Self::Puts => "puts",
 
             Self::Var => "var",
             Self::True => "true",

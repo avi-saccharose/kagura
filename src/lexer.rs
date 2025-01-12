@@ -1,11 +1,8 @@
 #![allow(dead_code)]
-use std::{
-    iter::Peekable,
-    str::{CharIndices, Chars},
-};
+use std::{iter::Peekable, str::CharIndices};
 
 use crate::{
-    error::KaguError,
+    error::{ErrorType, KaguError},
     token::{Kind, Span, Token},
 };
 
@@ -14,6 +11,10 @@ pub(crate) struct Lexer<'a> {
     text: &'a str,
     current: usize,
     line: usize,
+}
+
+pub(crate) fn tokenize(input: &str) -> Result<Vec<Token>, KaguError> {
+    Lexer::new(input).tokenize()
 }
 
 impl<'a> Lexer<'a> {
@@ -26,6 +27,7 @@ impl<'a> Lexer<'a> {
         }
     }
 
+    // TODO: return char instead
     fn peek(&mut self) -> Option<&(usize, char)> {
         self.source.peek()
     }
@@ -117,6 +119,10 @@ impl<'a> Lexer<'a> {
                 ',' => self.make_token(Kind::Comma, start),
                 '.' => self.make_token(Kind::Dot, start),
                 ';' => self.make_token(Kind::Semicolon, start),
+                '{' => self.make_token(Kind::Lbrace, start),
+                '}' => self.make_token(Kind::Rbrace, start),
+                '(' => self.make_token(Kind::Lparen, start),
+                ')' => self.make_token(Kind::Rparen, start),
 
                 '=' => {
                     if self.peek_match('=') {
@@ -151,6 +157,7 @@ impl<'a> Lexer<'a> {
                         msg: format!("unexpected character {}", ch),
                         line: self.line,
                         start,
+                        error_type: ErrorType::Lexer,
                     });
                 }
             };
@@ -194,6 +201,7 @@ impl<'a> Lexer<'a> {
             "var" => Kind::Var,
             "and" => Kind::And,
             "or" => Kind::Or,
+            "puts" => Kind::Puts,
             _ => Kind::Ident,
         };
         Ok(self.make_token(kind, start))
@@ -211,6 +219,7 @@ impl<'a> Lexer<'a> {
             msg: "Unterminated string".to_string(),
             line: self.line,
             start,
+            error_type: ErrorType::Lexer,
         })
     }
 }
