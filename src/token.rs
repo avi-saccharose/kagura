@@ -1,5 +1,6 @@
+#![allow(dead_code)]
 use core::fmt;
-use std::ops::Range;
+use std::ops::{Index, Range};
 
 #[derive(Debug, Copy, Clone, PartialEq, PartialOrd)]
 pub(crate) enum Kind {
@@ -49,13 +50,47 @@ pub(crate) enum Kind {
     Float,
     Ident,
 
-    EOF,
+    Eof,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub(crate) struct Token {
     pub(crate) kind: Kind,
-    pub(crate) span: Range<usize>,
+    pub(crate) span: Span<usize>,
+}
+
+impl Token {
+    fn text<'a>(&self, input: &'a str) -> &'a str {
+        &input[self.span]
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Hash, Default, Eq)]
+pub(crate) struct Span<T> {
+    pub(crate) start: T,
+    pub(crate) end: T,
+}
+
+impl From<Span<usize>> for Range<usize> {
+    fn from(span: Span<usize>) -> Self {
+        span.start..span.end
+    }
+}
+
+impl From<Range<usize>> for Span<usize> {
+    fn from(range: Range<usize>) -> Self {
+        Self {
+            start: range.start,
+            end: range.end,
+        }
+    }
+}
+
+impl Index<Span<usize>> for str {
+    type Output = str;
+    fn index(&self, index: Span<usize>) -> &Self::Output {
+        &self[Range::<usize>::from(index)]
+    }
 }
 
 impl fmt::Display for Kind {
@@ -107,7 +142,7 @@ impl fmt::Display for Kind {
             Self::Float => "float",
             Self::Ident => "identifier",
 
-            Self::EOF => "\0",
+            Self::Eof => "\0",
         };
         f.write_str(str)
     }
@@ -121,5 +156,15 @@ mod tests {
     fn kind_to_string() {
         let kind = Kind::Ampersand;
         assert_eq!(kind.to_string(), "&".to_string());
+    }
+
+    #[test]
+    fn span_text() {
+        let text = "while";
+        let token = Token {
+            kind: Kind::While,
+            span: Span { start: 0, end: 5 },
+        };
+        assert_eq!(token.text(text), "while");
     }
 }
