@@ -146,11 +146,28 @@ impl<'a> Parser<'a> {
         self.equality()
     }
     fn equality(&mut self) -> Result<Idx, KaguError> {
-        self.comparison()
+        let mut left = self.comparison()?;
+
+        while self.matches(&[Kind::EqEq, Kind::NtEq]) {
+            let op = self.previous();
+            let right = self.comparison()?;
+            let expr = Node::BinExpr(Bin { left, right, op });
+            left = self.add_node(expr);
+        }
+
+        Ok(left)
     }
 
     fn comparison(&mut self) -> Result<Idx, KaguError> {
-        self.term()
+        let mut left = self.term()?;
+        while self.matches(&[Kind::Lt, Kind::LtEq, Kind::Gt, Kind::GtEq]) {
+            let op = self.previous();
+            let right = self.term()?;
+            let expr = Node::BinExpr(Bin { left, right, op });
+            left = self.add_node(expr);
+        }
+
+        Ok(left)
     }
 
     fn term(&mut self) -> Result<Idx, KaguError> {
@@ -179,6 +196,7 @@ impl<'a> Parser<'a> {
         Ok(left)
     }
 
+    // TODO: Unary
     fn unary(&mut self) -> Result<Idx, KaguError> {
         self.primary()
     }
@@ -201,7 +219,20 @@ impl<'a> Parser<'a> {
                 let lit = Node::Lit(Lit::Nil);
                 Ok(self.add_node(lit))
             }
-            _ => Err(self.make_error("Expected expression")),
+            Kind::Lparen => {
+                self.advance();
+                let expr = self.expr()?;
+                self.consume(Kind::Rparen, "Expected ')' after expression")?;
+                Ok(expr)
+            }
+            _ => {
+                // If its not the last token we need to consume it because make_error uses the
+                // previous token
+                if !self.eof() {
+                    self.advance();
+                }
+                Err(self.make_error("Expected expression"))
+            }
         }
     }
 
@@ -263,6 +294,7 @@ mod tests {
 
     use super::*;
 
+    #[track_caller]
     fn run(source: &str) -> Result<Parser, KaguError> {
         let tokens = lexer::tokenize(source);
         assert!(tokens.is_ok());
@@ -273,10 +305,19 @@ mod tests {
 
     #[test]
     fn parse_expr() {
-        let input = "1 + 1;";
+        let input = "1 + 1 * 2;";
         let mut parsed = run(input).unwrap();
 
-        assert!(matches!(parsed.get(0), Node::BinExpr(..)));
+        assert!(matches!(
+            parsed.get(0),
+            Node::BinExpr(Bin {
+                op: Token {
+                    kind: Kind::Plus,
+                    ..
+                },
+                ..
+            })
+        ));
     }
 
     #[test]
@@ -284,6 +325,38 @@ mod tests {
         let input = "1 + ";
         let parsed = run(input);
         assert!(parsed.is_err());
+    }
+
+    #[test]
+    fn parse_binary() {
+        let input = "1 <= 1;";
+        let mut parsed = run(input).unwrap();
+        assert!(matches!(
+            parsed.get(0),
+            Node::BinExpr(Bin {
+                op: Token {
+                    kind: Kind::LtEq,
+                    ..
+                },
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn parse_grouping() {
+        let input = "(1 + 1) * 4;";
+        let mut parsed = run(input).unwrap();
+        assert!(matches!(
+            parsed.get(0),
+            Node::BinExpr(Bin {
+                op: Token {
+                    kind: Kind::Star,
+                    ..
+                },
+                ..
+            })
+        ));
     }
 
     #[test]
