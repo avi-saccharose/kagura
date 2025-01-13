@@ -61,7 +61,8 @@ pub(crate) enum Kind {
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub(crate) struct Token {
     pub(crate) kind: Kind,
-    pub(crate) line: usize,
+    pub(crate) line: u32,
+    pub(crate) column: u32,
     pub(crate) span: Span<usize>,
 }
 
@@ -175,6 +176,7 @@ mod tests {
         let token = Token {
             kind: Kind::While,
             line: 0,
+            column: 0,
             span: Span { start: 0, end: 5 },
         };
         assert_eq!(token.text(text), "while");

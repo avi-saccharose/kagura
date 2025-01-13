@@ -90,6 +90,7 @@ impl Interpreter {
         self.env.borrow().get(name).map_err(|e| KaguError {
             line: 0,
             start: 0,
+            column: 0,
             error_type: ErrorType::Runtime,
             msg: e,
         })
@@ -102,6 +103,7 @@ impl Interpreter {
             .map_err(|msg| KaguError {
                 line: 0,
                 start: 0,
+                column: 0,
                 error_type: ErrorType::Runtime,
                 msg,
             })

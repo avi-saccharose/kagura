@@ -1,7 +1,5 @@
 #![allow(dead_code)]
 
-use std::default;
-
 use crate::token::Token;
 
 #[derive(Debug, Copy, Clone, PartialEq)]

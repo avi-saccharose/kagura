@@ -10,7 +10,8 @@ pub(crate) struct Lexer<'a> {
     source: Peekable<CharIndices<'a>>,
     text: &'a str,
     current: usize,
-    line: usize,
+    line: u32,
+    column: u32,
 }
 
 pub(crate) fn tokenize(input: &str) -> Result<Vec<Token>, KaguError> {
@@ -24,6 +25,7 @@ impl<'a> Lexer<'a> {
             text: input,
             current: 0,
             line: 1,
+            column: 0,
         }
     }
 
@@ -44,6 +46,7 @@ impl<'a> Lexer<'a> {
 
     fn advance(&mut self) -> (usize, char) {
         self.current += 1;
+        self.column += 1;
         self.source.next().unwrap_or((self.current, '\0'))
     }
 
@@ -62,6 +65,7 @@ impl<'a> Lexer<'a> {
         Token {
             kind,
             line: self.line,
+            column: self.column,
             span: Span {
                 start,
                 end: self.current,
@@ -156,6 +160,7 @@ impl<'a> Lexer<'a> {
                     return Err(KaguError {
                         msg: format!("unexpected character {}", ch),
                         line: self.line,
+                        column: self.column,
                         start,
                         error_type: ErrorType::Lexer,
                     });
@@ -208,6 +213,7 @@ impl<'a> Lexer<'a> {
     }
 
     fn string(&mut self, start: usize, init: char) -> Result<Token, KaguError> {
+        let column = self.column;
         while let Some((_, ch)) = self.peek() {
             if *ch == init {
                 self.advance(); // Consume the char
@@ -218,6 +224,7 @@ impl<'a> Lexer<'a> {
         Err(KaguError {
             msg: "Unterminated string".to_string(),
             line: self.line,
+            column,
             start,
             error_type: ErrorType::Lexer,
         })

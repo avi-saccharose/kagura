@@ -13,6 +13,7 @@ struct Parser<'a> {
     indices: Vec<Idx>,
     tokens: Peekable<IntoIter<Token>>,
     source: &'a str,
+    prev: Option<Token>,
 }
 
 impl<'a> Parser<'a> {
@@ -22,31 +23,42 @@ impl<'a> Parser<'a> {
             indices: Vec::new(),
             tokens: tokens.into_iter().peekable(),
             source,
+            prev: None,
         }
     }
 
-    fn peek(&mut self) -> Kind {
+    fn peek_kind(&mut self) -> Kind {
         match self.tokens.peek() {
             Some(token) => token.kind,
             None => Kind::Eof,
         }
     }
 
+    fn peek(&mut self) -> &Token {
+        self.tokens.peek().unwrap()
+    }
+
     fn eof(&mut self) -> bool {
-        self.peek() == Kind::Eof
+        self.peek_kind() == Kind::Eof
     }
 
     fn advance(&mut self) -> Option<Token> {
+        self.prev = Some(*self.peek());
         self.tokens.next()
     }
 
+    fn previous(&mut self) -> Token {
+        self.prev.unwrap()
+    }
+
     fn check(&mut self, kind: Kind) -> bool {
-        self.peek() == kind
+        self.peek_kind() == kind
     }
 
     fn matches(&mut self, kinds: &[Kind]) -> bool {
         for kind in kinds.iter() {
             if self.check(*kind) {
+                self.advance();
                 return true;
             }
         }
@@ -61,26 +73,22 @@ impl<'a> Parser<'a> {
         self.nodes.alloc(node)
     }
 
+    fn make_error(&mut self, msg: &str) -> KaguError {
+        let token = self.previous();
+        KaguError {
+            msg: msg.to_string(),
+            line: token.line,
+            column: token.column,
+            start: token.span.start,
+            error_type: ErrorType::Parse,
+        }
+    }
+
     fn consume(&mut self, kind: Kind, msg: &str) -> Result<Token, KaguError> {
-        if self.eof() {
-            return Err(KaguError {
-                msg: msg.to_string(),
-                line: 0,
-                start: 0,
-                error_type: ErrorType::ParseEof,
-            });
+        if self.peek_kind() == kind {
+            return Ok(self.advance().unwrap());
         }
-        let token = self.advance().unwrap();
-        if token.kind == kind {
-            Ok(token)
-        } else {
-            Err(KaguError {
-                msg: msg.to_string(),
-                line: token.line,
-                start: token.span.start,
-                error_type: ErrorType::Parse,
-            })
-        }
+        Err(self.make_error(msg))
     }
 
     fn parse(&mut self) -> Result<(), KaguError> {
@@ -96,7 +104,7 @@ impl<'a> Parser<'a> {
     }
 
     fn stmt(&mut self) -> Result<Idx, KaguError> {
-        match self.peek() {
+        match self.peek_kind() {
             Kind::Puts => self.stmt_puts(),
             Kind::Lbrace => self.stmt_block(),
             _ => self.stmt_expr(),
@@ -149,7 +157,7 @@ impl<'a> Parser<'a> {
         let mut left = self.factor()?;
 
         while self.matches(&[Kind::Plus, Kind::Minus]) {
-            let op = self.advance().unwrap();
+            let op = self.previous();
             let right = self.factor()?;
             let expr = Node::BinExpr(Bin { left, right, op });
             left = self.add_node(expr);
@@ -162,7 +170,7 @@ impl<'a> Parser<'a> {
         let mut left = self.unary()?;
 
         while self.matches(&[Kind::Star, Kind::Slash]) {
-            let op = self.advance().unwrap();
+            let op = self.previous();
             let right = self.unary()?;
             let expr = Node::BinExpr(Bin { left, right, op });
             left = self.add_node(expr);
@@ -176,7 +184,7 @@ impl<'a> Parser<'a> {
     }
 
     fn primary(&mut self) -> Result<Idx, KaguError> {
-        match self.peek() {
+        match self.peek_kind() {
             Kind::Int | Kind::Ident | Kind::Str => self.make_literal(),
             Kind::True => {
                 self.advance();
@@ -193,12 +201,7 @@ impl<'a> Parser<'a> {
                 let lit = Node::Lit(Lit::Nil);
                 Ok(self.add_node(lit))
             }
-            _ => Err(KaguError {
-                msg: format!("Expected character found {}", self.peek()),
-                line: 0,
-                start: 0,
-                error_type: ErrorType::Parse,
-            }),
+            _ => Err(self.make_error("Expected expression")),
         }
     }
 
@@ -213,22 +216,33 @@ impl<'a> Parser<'a> {
                         return Err(KaguError {
                             msg: "Error parsing number".to_string(),
                             line: token.line,
+                            column: token.column,
                             start: token.span.start,
                             error_type: ErrorType::Parse,
                         })
                     }
                 };
-                let expr = Node::Lit(Lit::Int(int));
-                Ok(self.add_node(expr))
+                let lit = Node::Lit(Lit::Int(int));
+                Ok(self.add_node(lit))
             }
             Kind::Ident => {
-                todo!()
+                let lit = Node::Lit(Lit::Ident(lit.to_string()));
+                Ok(self.add_node(lit))
             }
             Kind::Str => {
-                todo!()
+                let lit = Node::Lit(Lit::String(lit.to_string()));
+                Ok(self.add_node(lit))
             }
             _ => unreachable!(),
         }
+    }
+
+    // WARN: Function only used while running tests
+    // TODO: Move to ast impl
+    fn get(&mut self, index: usize) -> Node {
+        let idx = self.indices.get(index).unwrap();
+        let node = self.nodes.get(*idx);
+        node.clone()
     }
 }
 
@@ -249,21 +263,35 @@ mod tests {
 
     use super::*;
 
-    fn tokenize(source: &str) -> Result<Vec<Token>, KaguError> {
-        lexer::tokenize(source)
+    fn run(source: &str) -> Result<Parser, KaguError> {
+        let tokens = lexer::tokenize(source);
+        assert!(tokens.is_ok());
+        let mut parsed = Parser::new(tokens.unwrap(), source);
+        parsed.parse()?;
+        Ok(parsed)
     }
 
     #[test]
     fn parse_expr() {
-        let input = "puts 1; puts 2; puts 3;";
-        let parsed = parse(input);
-        assert!(parsed.is_ok());
+        let input = "1 + 1;";
+        let mut parsed = run(input).unwrap();
+
+        assert!(matches!(parsed.get(0), Node::BinExpr(..)));
+    }
+
+    #[test]
+    fn parse_error() {
+        let input = "1 + ";
+        let parsed = run(input);
+        assert!(parsed.is_err());
     }
 
     #[test]
     fn parse_block() {
         let input = "1; { puts 1; puts 2; } puts 3; {}";
-        let parsed = parse(input);
-        assert!(parsed.is_ok());
+        let mut parsed = run(input).unwrap();
+        assert!(matches!(parsed.get(0), Node::Lit(..)));
+        assert!(matches!(parsed.get(1), Node::Block(..)));
+        assert!(matches!(parsed.get(2), Node::Puts(..)));
     }
 }
