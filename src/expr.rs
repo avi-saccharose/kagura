@@ -1,5 +1,7 @@
 #![allow(dead_code)]
 
+use std::default;
+
 use crate::token::Token;
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -8,6 +10,21 @@ pub(crate) struct Idx(pub usize);
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct Arena<T> {
     pub(crate) data: Vec<T>,
+}
+
+#[derive(Debug)]
+pub struct Ast {
+    pub nodes: Arena<Node>,
+    pub indices: Vec<Idx>,
+}
+
+impl Default for Ast {
+    fn default() -> Self {
+        Self {
+            nodes: Arena::new(),
+            indices: Vec::new(),
+        }
+    }
 }
 
 impl<T> Arena<T> {
@@ -27,14 +44,6 @@ impl<T> Arena<T> {
     }
 }
 
-// TODO: combine both statements and expressions into a single enum to use a single ast
-#[derive(Debug, Clone, PartialEq)]
-pub(crate) enum Stmt {
-    Expr(Idx),
-    Puts(Idx),
-    Block(Block),
-}
-
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum Node {
     BinExpr(Bin),
@@ -51,13 +60,6 @@ pub(crate) struct Block {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) enum Expr {
-    Bin(Bin),
-    Lit(Lit),
-    Unary(Unary),
-}
-
-#[derive(Debug, Clone, PartialEq)]
 pub(crate) struct Bin {
     pub(crate) left: Idx,
     pub(crate) right: Idx,
@@ -65,26 +67,18 @@ pub(crate) struct Bin {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) struct Unary {}
+pub(crate) struct Unary {
+    pub(crate) left: Idx,
+    pub(crate) op: Token,
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum Lit {
     Ident(String),
+    String(String),
     Int(i64),
     Bool(bool),
     Nil,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub(crate) struct Ast {
-    pub(crate) stmts: Arena<Stmt>,
-    pub(crate) exprs: Arena<Expr>,
-}
-
-impl Ast {
-    pub fn new(stmts: Arena<Stmt>, exprs: Arena<Expr>) -> Self {
-        Self { stmts, exprs }
-    }
 }
 
 #[cfg(test)]
@@ -93,7 +87,7 @@ mod tests {
     #[test]
     #[ignore]
     fn ast() {
-        let _stmts = Arena::<Stmt>::new();
+        let _stmts = Arena::<Node>::new();
         //let stmt = Stmt::Expr(Expr::Lit(Lit::Bool(true)));
         //stmts.alloc(stmt);
     }

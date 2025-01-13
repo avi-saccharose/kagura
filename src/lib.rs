@@ -1,6 +1,6 @@
 mod error;
 mod expr;
+mod interpreter;
 mod lexer;
-mod parse;
 mod parser;
 mod token;

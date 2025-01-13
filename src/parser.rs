@@ -3,7 +3,7 @@ use std::{iter::Peekable, vec::IntoIter};
 
 use crate::{
     error::{ErrorType, KaguError},
-    expr::{Arena, Bin, Block, Expr, Idx, Lit, Node, Stmt},
+    expr::{Arena, Ast, Bin, Block, Idx, Lit, Node},
     lexer,
     token::{Kind, Token},
 };
@@ -243,12 +243,6 @@ pub(crate) fn parse(input: &str) -> Result<Ast, KaguError> {
     Ok(ast)
 }
 
-#[derive(Debug)]
-struct Ast {
-    nodes: Arena<Node>,
-    indices: Vec<Idx>,
-}
-
 #[cfg(test)]
 mod tests {
     use crate::lexer::{self};
@@ -264,14 +258,12 @@ mod tests {
         let input = "puts 1; puts 2; puts 3;";
         let parsed = parse(input);
         assert!(parsed.is_ok());
-        let parsed = parsed.unwrap();
-        dbg!(parsed);
     }
 
     #[test]
     fn parse_block() {
         let input = "1; { puts 1; puts 2; } puts 3; {}";
-        let parsed = parse(input).unwrap();
-        dbg!(parsed);
+        let parsed = parse(input);
+        assert!(parsed.is_ok());
     }
 }
