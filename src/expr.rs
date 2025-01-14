@@ -25,6 +25,12 @@ impl Default for Ast {
     }
 }
 
+impl Ast {
+    pub(crate) fn get(&self, idx: Idx) -> &Node {
+        self.nodes.get(idx)
+    }
+}
+
 impl<T> Arena<T> {
     pub fn new() -> Self {
         Self {
@@ -66,7 +72,7 @@ pub(crate) struct Bin {
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct Unary {
-    pub(crate) left: Idx,
+    pub(crate) right: Idx,
     pub(crate) op: Token,
 }
 

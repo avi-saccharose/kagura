@@ -3,7 +3,7 @@ use std::{iter::Peekable, vec::IntoIter};
 
 use crate::{
     error::{ErrorType, KaguError},
-    expr::{Arena, Ast, Bin, Block, Idx, Lit, Node},
+    expr::{Arena, Ast, Bin, Block, Idx, Lit, Node, Unary},
     lexer,
     token::{Kind, Token},
 };
@@ -196,8 +196,13 @@ impl<'a> Parser<'a> {
         Ok(left)
     }
 
-    // TODO: Unary
     fn unary(&mut self) -> Result<Idx, KaguError> {
+        if self.matches(&[Kind::Bang, Kind::Minus]) {
+            let op = self.previous();
+            let right = self.expr()?;
+            let expr = Node::Unary(Unary { right, op });
+            return Ok(self.add_node(expr));
+        }
         self.primary()
     }
 
@@ -341,6 +346,13 @@ mod tests {
                 ..
             })
         ));
+    }
+
+    #[test]
+    fn parse_unary() {
+        let input = "-1;";
+        let mut parsed = run(input).unwrap();
+        assert!(matches!(parsed.get(0), Node::Unary(..)));
     }
 
     #[test]
