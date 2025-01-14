@@ -1,13 +1,14 @@
 use std::io::{self, Write};
 
 use error::KaguError;
-
+use expr::Ast;
+use interpreter::Interpreter;
 mod error;
 mod expr;
+mod interpreter;
 mod lexer;
 mod parser;
 mod token;
-
 fn print_error(e: KaguError, source: &str) {
     let line = e.line as usize;
     let column = e.column as usize;
@@ -36,10 +37,20 @@ fn repl() {
         }
 
         let ast = parser::parse(&line);
+        match ast {
+            Err(e) => {
+                print_error(e, &line);
+                continue;
+            }
+            Ok(res) => {
+                let default = Ast::default();
 
-        if let Err(e) = ast {
-            print_error(e, &line);
-            continue;
+                // INFO: we can't create interpreters that has a different lifetime than the ast
+                let mut interpreter = Interpreter::new(&default);
+                if let Err(e) = interpreter.eval(&res) {
+                    print_error(e, &line);
+                }
+            }
         }
     }
 }

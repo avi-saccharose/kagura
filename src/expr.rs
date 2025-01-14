@@ -10,7 +10,7 @@ pub(crate) struct Arena<T> {
     pub(crate) data: Vec<T>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Ast {
     pub nodes: Arena<Node>,
     pub indices: Vec<Idx>,

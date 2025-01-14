@@ -69,14 +69,19 @@ impl Env {
     }
 }
 
+// TODO: Change lifetime/type of ast
+// currently we can't create asts that live shorter than the interpreter(no repl support)
+// also, we have to pass in an ast when constructing the interpreter
+// and another when evaluating as well
+// Maybe we can chane the env instead?
 #[derive(Debug)]
-struct Interpreter<'a> {
-    ast: &'a Ast,
+pub(crate) struct Interpreter<'a> {
+    pub ast: &'a Ast,
     env: Rc<RefCell<Env>>,
 }
 
 impl<'a> Interpreter<'a> {
-    fn new(ast: &'a Ast) -> Self {
+    pub fn new(ast: &'a Ast) -> Self {
         Self {
             ast,
             env: Rc::new(RefCell::new(Env::new())),
@@ -138,7 +143,7 @@ impl<'a> Interpreter<'a> {
         }
     }
 
-    fn eval(&mut self, ast: &'a Ast) -> Result<(), KaguError> {
+    pub fn eval(&mut self, ast: &'a Ast) -> Result<(), KaguError> {
         self.ast = ast;
         let mut indices = ast.indices.iter();
         while let Some(idx) = indices.next() {
@@ -267,7 +272,6 @@ mod tests {
     #[test]
     fn eval_unary_bang() {
         let parsed = parse("!true;").unwrap();
-        dbg!(&parsed);
         let mut interpreter = Interpreter::new(&parsed);
         assert_eq!(interpreter.eval_expr(Idx(1)), Ok(Value::Bool(false)));
     }
