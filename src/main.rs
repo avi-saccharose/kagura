@@ -1,7 +1,6 @@
 use std::io::{self, Write};
 
 use error::KaguError;
-use expr::Ast;
 use interpreter::Interpreter;
 mod error;
 mod expr;
@@ -9,6 +8,7 @@ mod interpreter;
 mod lexer;
 mod parser;
 mod token;
+
 fn print_error(e: KaguError, source: &str) {
     let line = e.line as usize;
     let column = e.column as usize;
@@ -20,8 +20,18 @@ fn print_error(e: KaguError, source: &str) {
     eprintln!("{: >column$} here", "^");
 }
 
-// For now just parse and print the error if any
+fn print_help() {
+    println!("Kagura Compiler");
+    println!("-help: Show this");
+    println!("-env: Print the env stack");
+    println!("-q: Exit the repl");
+}
+
 fn repl() {
+    let mut interpreter = Interpreter::new();
+
+    println!("Kagura Compiler input '-help' for help");
+
     loop {
         let mut line = String::new();
         print!(">> ");
@@ -30,6 +40,20 @@ fn repl() {
             .read_line(&mut line)
             .expect("failed to read line");
 
+        match line.trim_ascii() {
+            "-help" => {
+                print_help();
+                continue;
+            }
+            "-env" => {
+                dbg!(&interpreter.env);
+                continue;
+            }
+            "-q" => {
+                std::process::exit(0);
+            }
+            _ => {}
+        }
         let lexed = lexer::tokenize(&line);
         if let Err(e) = lexed {
             print_error(e, &line);
@@ -43,10 +67,6 @@ fn repl() {
                 continue;
             }
             Ok(res) => {
-                let default = Ast::default();
-
-                // INFO: we can't create interpreters that has a different lifetime than the ast
-                let mut interpreter = Interpreter::new(&default);
                 if let Err(e) = interpreter.eval(&res) {
                     print_error(e, &line);
                 }

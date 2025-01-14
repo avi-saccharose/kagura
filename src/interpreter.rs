@@ -28,7 +28,7 @@ impl fmt::Display for Value {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-struct Env {
+pub(crate) struct Env {
     values: HashMap<String, Value>,
     enclosing: Option<Rc<RefCell<Env>>>,
 }
@@ -69,21 +69,16 @@ impl Env {
     }
 }
 
-// TODO: Change lifetime/type of ast
-// currently we can't create asts that live shorter than the interpreter(no repl support)
-// also, we have to pass in an ast when constructing the interpreter
-// and another when evaluating as well
-// Maybe we can chane the env instead?
+// TODO: Way to store reference to the ast that can live shorter than the Interpreter
+// Another option would be to directly own the ast
 #[derive(Debug)]
-pub(crate) struct Interpreter<'a> {
-    pub ast: &'a Ast,
-    env: Rc<RefCell<Env>>,
+pub(crate) struct Interpreter {
+    pub env: Rc<RefCell<Env>>,
 }
 
-impl<'a> Interpreter<'a> {
-    pub fn new(ast: &'a Ast) -> Self {
+impl Interpreter {
+    pub fn new() -> Self {
         Self {
-            ast,
             env: Rc::new(RefCell::new(Env::new())),
         }
     }
@@ -143,46 +138,45 @@ impl<'a> Interpreter<'a> {
         }
     }
 
-    pub fn eval(&mut self, ast: &'a Ast) -> Result<(), KaguError> {
-        self.ast = ast;
+    pub fn eval(&mut self, ast: &Ast) -> Result<(), KaguError> {
         let mut indices = ast.indices.iter();
         while let Some(idx) = indices.next() {
-            self.eval_node(*idx)?;
+            self.eval_node(ast, *idx)?;
         }
         Ok(())
     }
 
     // Handle only statements as expressions produce a value
-    fn eval_node(&mut self, idx: Idx) -> Result<(), KaguError> {
-        let node = self.ast.get(idx);
+    fn eval_node(&mut self, ast: &Ast, idx: Idx) -> Result<(), KaguError> {
+        let node = ast.get(idx);
         match node {
-            Node::Puts(idx) => self.eval_puts(*idx),
+            Node::Puts(idx) => self.eval_puts(ast, *idx),
             _ => {
-                self.eval_expr(idx)?;
+                self.eval_expr(ast, idx)?;
                 Ok(())
             }
         }
     }
 
-    fn eval_puts(&mut self, idx: Idx) -> Result<(), KaguError> {
-        let expr = self.eval_expr(idx)?;
+    fn eval_puts(&mut self, ast: &Ast, idx: Idx) -> Result<(), KaguError> {
+        let expr = self.eval_expr(ast, idx)?;
         println!("{}", expr);
         Ok(())
     }
 
-    fn eval_expr(&mut self, idx: Idx) -> Result<Value, KaguError> {
-        let node = self.ast.get(idx);
+    fn eval_expr(&mut self, ast: &Ast, idx: Idx) -> Result<Value, KaguError> {
+        let node = ast.get(idx);
         match node {
-            Node::BinExpr(bin) => self.eval_bin(bin),
-            Node::Unary(unary) => self.eval_unary(unary),
-            Node::Lit(lit) => self.eval_lit(lit),
+            Node::BinExpr(bin) => self.eval_bin(ast, bin),
+            Node::Unary(unary) => self.eval_unary(ast, unary),
+            Node::Lit(lit) => self.eval_lit(ast, lit),
             _ => unreachable!(),
         }
     }
 
-    fn eval_bin(&mut self, bin: &Bin) -> Result<Value, KaguError> {
-        let left = self.eval_expr(bin.left)?;
-        let right = self.eval_expr(bin.right)?;
+    fn eval_bin(&mut self, ast: &Ast, bin: &Bin) -> Result<Value, KaguError> {
+        let left = self.eval_expr(ast, bin.left)?;
+        let right = self.eval_expr(ast, bin.right)?;
         let op = bin.op;
 
         match (left, right) {
@@ -213,8 +207,8 @@ impl<'a> Interpreter<'a> {
         }
     }
 
-    fn eval_unary(&mut self, unary: &Unary) -> Result<Value, KaguError> {
-        let right = self.eval_expr(unary.right)?;
+    fn eval_unary(&mut self, ast: &Ast, unary: &Unary) -> Result<Value, KaguError> {
+        let right = self.eval_expr(ast, unary.right)?;
         let op = unary.op;
         match op.kind {
             Kind::Bang => Ok(Value::Bool(!self.is_truthy(&right))),
@@ -229,7 +223,7 @@ impl<'a> Interpreter<'a> {
         }
     }
 
-    fn eval_lit(&mut self, lit: &Lit) -> Result<Value, KaguError> {
+    fn eval_lit(&mut self, _ast: &Ast, lit: &Lit) -> Result<Value, KaguError> {
         let literal = match lit {
             Lit::Ident(ident) => Value::Ident(ident.clone()),
             Lit::Nil => Value::Nil,
@@ -259,20 +253,29 @@ mod tests {
     #[test]
     fn eval_bin() {
         let parsed = parse("1 + 2;").unwrap();
-        let mut interpreter = Interpreter::new(&parsed);
-        assert_eq!(interpreter.eval_expr(Idx(2)).unwrap(), Value::Number(3));
+        let mut interpreter = Interpreter::new();
+        assert_eq!(
+            interpreter.eval_expr(&parsed, Idx(2)).unwrap(),
+            Value::Number(3)
+        );
     }
 
     #[test]
     fn eval_unary() {
         let parsed = parse("-2;").unwrap();
-        let mut interpreter = Interpreter::new(&parsed);
-        assert_eq!(interpreter.eval_expr(Idx(1)), Ok(Value::Number(-2)));
+        let mut interpreter = Interpreter::new();
+        assert_eq!(
+            interpreter.eval_expr(&parsed, Idx(1)),
+            Ok(Value::Number(-2))
+        );
     }
     #[test]
     fn eval_unary_bang() {
         let parsed = parse("!true;").unwrap();
-        let mut interpreter = Interpreter::new(&parsed);
-        assert_eq!(interpreter.eval_expr(Idx(1)), Ok(Value::Bool(false)));
+        let mut interpreter = Interpreter::new();
+        assert_eq!(
+            interpreter.eval_expr(&parsed, Idx(1)),
+            Ok(Value::Bool(false))
+        );
     }
 }
