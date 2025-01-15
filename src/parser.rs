@@ -3,7 +3,7 @@ use std::{iter::Peekable, vec::IntoIter};
 
 use crate::{
     error::{ErrorType, KaguError},
-    expr::{Arena, Assign, Ast, Bin, Block, Idx, If, Lit, Node, Unary, Var, VarDecl},
+    expr::{Arena, Assign, Ast, Bin, Block, Idx, If, Lit, Logical, Node, Unary, Var, VarDecl},
     lexer,
     token::{Kind, Token},
 };
@@ -476,5 +476,34 @@ mod tests {
                 ..
             })
         ));
+    }
+
+    #[test]
+    fn parse_or() {
+        let input = "true or false;";
+        let mut parsed = run(input).unwrap();
+        assert!(matches!(
+            parsed.get(0),
+            Node::Logical(Logical {
+                op: Token { kind: Kind::Or, .. },
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn parse_and() {
+        let input = "true and false;";
+        let mut parsed = run(input).unwrap();
+        assert!(matches!(
+            parsed.get(0),
+            Node::Logical(Logical {
+                op: Token {
+                    kind: Kind::And,
+                    ..
+                },
+                ..
+            })
+        ))
     }
 }

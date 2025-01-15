@@ -89,6 +89,8 @@ pub(crate) enum Node {
     BinExpr(Bin),
     // Unary Expression
     Unary(Unary),
+    // Logical Expression
+    Logical(Logical),
     // Variable Expression
     Var(Var),
     // Literal Expression
@@ -131,6 +133,13 @@ pub(crate) struct Bin {
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct Unary {
+    pub(crate) right: Idx,
+    pub(crate) op: Token,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct Logical {
+    pub(crate) left: Idx,
     pub(crate) right: Idx,
     pub(crate) op: Token,
 }

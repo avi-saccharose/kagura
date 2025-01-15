@@ -4,7 +4,7 @@ use std::{cell::RefCell, fmt, rc::Rc};
 
 use crate::{
     error::{ErrorType, KaguError},
-    expr::{Assign, Ast, Bin, Block, Idx, If, Lit, Node, Unary, Var, VarDecl},
+    expr::{Assign, Ast, Bin, Block, Idx, If, Lit, Logical, Node, Unary, Var, VarDecl},
     token::{Kind, Token},
 };
 
@@ -380,6 +380,21 @@ mod tests {
         assert_eq!(
             interpreter.get("a", default_token()).unwrap(),
             Value::Number(2)
+        );
+    }
+
+    #[test]
+    fn eval_logical() {
+        let parsed = parse("var x = true and false; var y = true or false;").unwrap();
+        let mut interpreter = Interpreter::new();
+        interpreter.eval(&parsed).unwrap();
+        assert_eq!(
+            interpreter.get("x", default_token()).unwrap(),
+            Value::Bool(false)
+        );
+        assert_eq!(
+            interpreter.get("y", default_token()).unwrap(),
+            Value::Bool(true)
         );
     }
 }
