@@ -2,6 +2,7 @@
 use std::collections::HashMap;
 use std::{cell::RefCell, fmt, rc::Rc};
 
+use crate::expr::While;
 use crate::{
     error::{ErrorType, KaguError},
     expr::{Assign, Ast, Bin, Block, Idx, If, Lit, Logical, Node, Unary, Var, VarDecl},
@@ -156,6 +157,7 @@ impl Interpreter {
             Node::Block(block) => self.eval_block(ast, block),
             Node::Puts(idx) => self.eval_puts(ast, *idx),
             Node::VarDecl(var_decl) => self.eval_var_decl(ast, var_decl),
+            Node::While(stmt) => self.eval_while(ast, stmt),
 
             _ => {
                 // Evalute the expression and discard the result
@@ -203,6 +205,18 @@ impl Interpreter {
             init = self.eval_expr(ast, expr)?;
         }
         self.define(name, init);
+        Ok(())
+    }
+
+    fn eval_while(&mut self, ast: &Ast, stmt: &While) -> Result<(), KaguError> {
+        loop {
+            let cond = self.eval_expr(ast, stmt.cond)?;
+            if !self.is_truthy(&cond) {
+                break;
+            }
+            self.eval_node(ast, stmt.body)?;
+        }
+
         Ok(())
     }
 
@@ -410,6 +424,22 @@ mod tests {
         assert_eq!(
             interpreter.get("y", default_token()).unwrap(),
             Value::Bool(true)
+        );
+    }
+
+    #[test]
+    fn eval_while() {
+        let parsed =
+            parse("var a = 10; var i = 0; while(i < 4) { a = a + 1; i = i + 1; }").unwrap();
+        let mut interpreter = Interpreter::new();
+        interpreter.eval(&parsed).unwrap();
+        assert_eq!(
+            interpreter.get("a", default_token()).unwrap(),
+            Value::Number(14)
+        );
+        assert_eq!(
+            interpreter.get("i", default_token()).unwrap(),
+            Value::Number(4)
         );
     }
 }

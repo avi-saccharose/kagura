@@ -1,5 +1,7 @@
 #![allow(dead_code)]
 
+use std::default;
+
 use crate::token::Token;
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -76,6 +78,8 @@ pub(crate) enum Node {
     If(If),
     // Variable Declaration
     VarDecl(VarDecl),
+    // While Statements
+    While(While),
     // Block Statements
     Block(Block),
     // Puts Statement
@@ -109,6 +113,12 @@ pub(crate) struct VarDecl {
     pub(crate) name: String,
     pub(crate) token: Token,
     pub(crate) init: Option<Idx>,
+}
+
+#[derive(Debug, Clone, PartialEq, Copy)]
+pub(crate) struct While {
+    pub(crate) cond: Idx,
+    pub(crate) body: Idx,
 }
 
 #[derive(Debug, Clone, PartialEq, Copy)]

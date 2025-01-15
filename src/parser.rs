@@ -3,7 +3,9 @@ use std::{iter::Peekable, vec::IntoIter};
 
 use crate::{
     error::{ErrorType, KaguError},
-    expr::{Arena, Assign, Ast, Bin, Block, Idx, If, Lit, Logical, Node, Unary, Var, VarDecl},
+    expr::{
+        Arena, Assign, Ast, Bin, Block, Idx, If, Lit, Logical, Node, Unary, Var, VarDecl, While,
+    },
     lexer,
     token::{Kind, Token},
 };
@@ -119,6 +121,7 @@ impl<'a> Parser<'a> {
         match self.peek_kind() {
             Kind::If => self.stmt_if(),
             Kind::Puts => self.stmt_puts(),
+            Kind::While => self.stmt_while(),
             Kind::Lbrace => self.stmt_block(),
             _ => self.stmt_expr(),
         }
@@ -149,6 +152,18 @@ impl<'a> Parser<'a> {
         let expr = self.expr()?;
         self.consume(Kind::Semicolon, "expect ';' after puts")?;
         let idx = self.add_node(Node::Puts(expr));
+        Ok(idx)
+    }
+
+    fn stmt_while(&mut self) -> Result<Idx, KaguError> {
+        self.advance();
+        self.consume(Kind::Lparen, "Expected '(' after while")?;
+        let cond = self.expr()?;
+        self.consume(Kind::Rparen, "Expected ')' after expression")?;
+
+        let body = self.stmt()?;
+
+        let idx = self.add_node(Node::While(While { cond, body }));
         Ok(idx)
     }
 
@@ -530,5 +545,12 @@ mod tests {
                 ..
             })
         ))
+    }
+
+    #[test]
+    fn parse_while() {
+        let input = "while(true) puts true;";
+        let mut parsed = run(input).unwrap();
+        assert!(matches!(parsed.get(0), Node::While(..)))
     }
 }
