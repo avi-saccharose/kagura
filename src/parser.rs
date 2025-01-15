@@ -3,7 +3,7 @@ use std::{iter::Peekable, vec::IntoIter};
 
 use crate::{
     error::{ErrorType, KaguError},
-    expr::{Arena, Ast, Bin, Block, Idx, Lit, Node, Unary},
+    expr::{Arena, Assign, Ast, Bin, Block, Idx, Lit, Node, Unary, Var, VarDecl},
     lexer,
     token::{Kind, Token},
 };
@@ -100,6 +100,18 @@ impl<'a> Parser<'a> {
     }
 
     fn stmt_declaration(&mut self) -> Result<Idx, KaguError> {
+        if self.matches(&[Kind::Var]) {
+            let token = self.consume(Kind::Ident, "Expected variable name")?;
+            let mut init: Option<Idx> = None;
+            if self.matches(&[Kind::Eq]) {
+                init = Some(self.expr()?);
+            }
+            self.consume(Kind::Semicolon, "Expected ';' after variable declaration")?;
+            let name = token.text(self.source).to_string();
+            let var_decl = VarDecl { name, token, init };
+            let idx = self.add_node(Node::VarDecl(var_decl));
+            return Ok(idx);
+        }
         self.stmt()
     }
 
@@ -142,8 +154,27 @@ impl<'a> Parser<'a> {
         self.assignment()
     }
 
+    // TODO: currently when checking for assignment, if it is of type var
+    // we create a new assignment struct by copying the name of the var
+    // very inefficiently and the var remains garbage value
     fn assignment(&mut self) -> Result<Idx, KaguError> {
-        self.equality()
+        let expr = self.equality()?;
+        if self.matches(&[Kind::Eq]) {
+            let token = self.previous();
+            let value = self.assignment()?;
+            let name = self.check_assignment(expr)?;
+            let node = Node::Assign(Assign { name, value, token });
+            return Ok(self.add_node(node));
+        }
+        Ok(expr)
+    }
+
+    fn check_assignment(&mut self, idx: Idx) -> Result<String, KaguError> {
+        if let Node::Var(var) = self.nodes.get(idx) {
+            let name = var.name.clone();
+            return Ok(name);
+        }
+        Err(self.make_error("Invalid assignment target"))
     }
     fn equality(&mut self) -> Result<Idx, KaguError> {
         let mut left = self.comparison()?;
@@ -262,7 +293,10 @@ impl<'a> Parser<'a> {
                 Ok(self.add_node(lit))
             }
             Kind::Ident => {
-                let lit = Node::Lit(Lit::Ident(lit.to_string()));
+                let lit = Node::Var(Var {
+                    name: lit.to_string(),
+                    token,
+                });
                 Ok(self.add_node(lit))
             }
             Kind::Str => {
@@ -378,5 +412,26 @@ mod tests {
         assert!(matches!(parsed.get(0), Node::Lit(..)));
         assert!(matches!(parsed.get(1), Node::Block(..)));
         assert!(matches!(parsed.get(2), Node::Puts(..)));
+    }
+
+    #[test]
+    fn parse_var() {
+        let input = "a;";
+        let mut parsed = run(input).unwrap();
+        assert!(matches!(parsed.get(0), Node::Var(..)))
+    }
+
+    #[test]
+    fn parse_var_declaration() {
+        let input = "var a; var b = nil;";
+        let mut parsed = run(input).unwrap();
+        assert!(matches!(parsed.get(0), Node::VarDecl(..)));
+    }
+
+    #[test]
+    fn parse_assignment() {
+        let input = "a = 9;";
+        let mut parsed = run(input).unwrap();
+        assert!(matches!(parsed.get(0), Node::Assign(..)))
     }
 }

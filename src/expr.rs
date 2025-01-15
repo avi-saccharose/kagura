@@ -46,21 +46,55 @@ impl<T> Arena<T> {
     pub(crate) fn get(&self, idx: Idx) -> &T {
         &self.data[idx.0]
     }
+
+    pub(crate) fn pop(&mut self) -> Option<T> {
+        self.data.pop()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum Node {
-    BinExpr(Bin),
-    Unary(Unary),
-    Lit(Lit),
-    Puts(Idx),
+    // Statements
+
+    // Variable Declaration
+    VarDecl(VarDecl),
+    // Block Statements
     Block(Block),
+    // Puts Statement
+    Puts(Idx),
+
+    // Expressions
+
+    // Assignment
+    Assign(Assign),
+    // Binary Expression
+    BinExpr(Bin),
+    // Unary Expression
+    Unary(Unary),
+    // Variable Expression
+    Var(Var),
+    // Literal Expression
+    Lit(Lit),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct VarDecl {
+    pub(crate) name: String,
+    pub(crate) token: Token,
+    pub(crate) init: Option<Idx>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct Block {
     pub(crate) start: Idx,
     pub(crate) end: Idx,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct Assign {
+    pub(crate) name: String,
+    pub(crate) token: Token,
+    pub(crate) value: Idx,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -77,22 +111,16 @@ pub(crate) struct Unary {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub(crate) struct Var {
+    pub(crate) name: String,
+    pub(crate) token: Token,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub(crate) enum Lit {
     Ident(String),
     String(String),
     Int(i64),
     Bool(bool),
     Nil,
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    #[ignore]
-    fn ast() {
-        let _stmts = Arena::<Node>::new();
-        //let stmt = Stmt::Expr(Expr::Lit(Lit::Bool(true)));
-        //stmts.alloc(stmt);
-    }
 }

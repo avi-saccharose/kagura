@@ -3,7 +3,7 @@ use std::{cell::RefCell, collections::HashMap, fmt, rc::Rc};
 
 use crate::{
     error::{ErrorType, KaguError},
-    expr::{Ast, Bin, Idx, Lit, Node, Unary},
+    expr::{Assign, Ast, Bin, Idx, Lit, Node, Unary, Var, VarDecl},
     token::{Kind, Token},
 };
 
@@ -41,8 +41,8 @@ impl Env {
         }
     }
 
-    fn define(&mut self, name: String, value: Value) {
-        self.values.insert(name, value);
+    fn define(&mut self, name: &str, value: Value) {
+        self.values.insert(name.to_string(), value);
     }
 
     fn get(&self, name: &str) -> Result<Value, String> {
@@ -56,8 +56,8 @@ impl Env {
         enclosing.get(name)
     }
 
-    fn assign(&mut self, name: String, value: Value) -> Result<(), String> {
-        if let Some(_) = self.values.get(&name) {
+    fn assign(&mut self, name: &str, value: Value) -> Result<(), String> {
+        if let Some(_) = self.values.get(name) {
             self.define(name, value);
             return Ok(());
         }
@@ -83,28 +83,28 @@ impl Interpreter {
         }
     }
 
-    fn define(&mut self, name: String, value: Value) {
+    fn define(&mut self, name: &str, value: Value) {
         self.env.borrow_mut().define(name, value);
     }
 
-    fn get(&self, name: &str) -> Result<Value, KaguError> {
+    fn get(&self, name: &str, token: Token) -> Result<Value, KaguError> {
         self.env.borrow().get(name).map_err(|e| KaguError {
-            line: 0,
-            start: 0,
-            column: 0,
+            line: token.line,
+            start: token.span.start,
+            column: token.column,
             error_type: ErrorType::Runtime,
             msg: e,
         })
     }
 
-    fn assign(&mut self, name: String, value: Value) -> Result<(), KaguError> {
+    fn assign(&mut self, name: &str, value: Value, token: Token) -> Result<(), KaguError> {
         self.env
             .borrow_mut()
             .assign(name, value)
             .map_err(|msg| KaguError {
-                line: 0,
-                start: 0,
-                column: 0,
+                line: token.line,
+                start: token.span.start,
+                column: token.column,
                 error_type: ErrorType::Runtime,
                 msg,
             })
@@ -151,6 +151,8 @@ impl Interpreter {
         let node = ast.get(idx);
         match node {
             Node::Puts(idx) => self.eval_puts(ast, *idx),
+            Node::VarDecl(var_decl) => self.eval_var_decl(ast, var_decl),
+
             _ => {
                 self.eval_expr(ast, idx)?;
                 Ok(())
@@ -164,14 +166,34 @@ impl Interpreter {
         Ok(())
     }
 
+    fn eval_var_decl(&mut self, ast: &Ast, var: &VarDecl) -> Result<(), KaguError> {
+        let name = &var.name;
+        let mut init = Value::Nil;
+        if let Some(expr) = var.init {
+            init = self.eval_expr(ast, expr)?;
+        }
+        self.define(name, init);
+        Ok(())
+    }
+
     fn eval_expr(&mut self, ast: &Ast, idx: Idx) -> Result<Value, KaguError> {
         let node = ast.get(idx);
         match node {
+            Node::Assign(assign) => self.eval_assign(ast, assign),
             Node::BinExpr(bin) => self.eval_bin(ast, bin),
             Node::Unary(unary) => self.eval_unary(ast, unary),
+            Node::Var(var) => self.eval_var(ast, var),
             Node::Lit(lit) => self.eval_lit(ast, lit),
             _ => unreachable!(),
         }
+    }
+
+    fn eval_assign(&mut self, ast: &Ast, assign: &Assign) -> Result<Value, KaguError> {
+        let name = &assign.name;
+        let value = self.eval_expr(ast, assign.value)?;
+        let token = assign.token;
+        self.assign(name, value, token)?;
+        Ok(Value::Nil)
     }
 
     fn eval_bin(&mut self, ast: &Ast, bin: &Bin) -> Result<Value, KaguError> {
@@ -223,6 +245,10 @@ impl Interpreter {
         }
     }
 
+    fn eval_var(&mut self, _ast: &Ast, lit: &Var) -> Result<Value, KaguError> {
+        self.get(&lit.name, lit.token)
+    }
+
     fn eval_lit(&mut self, _ast: &Ast, lit: &Lit) -> Result<Value, KaguError> {
         let literal = match lit {
             Lit::Ident(ident) => Value::Ident(ident.clone()),
@@ -245,7 +271,7 @@ mod tests {
     fn env_vars() {
         let mut env = Env::new();
         assert!(env.get("undefined").is_err());
-        env.define("a".to_string(), Value::Bool(true));
+        env.define("a", Value::Bool(true));
         assert!(env.get("a").is_ok());
         assert_eq!(env.get("a").unwrap(), Value::Bool(true));
     }
