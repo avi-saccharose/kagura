@@ -1,9 +1,10 @@
 #![allow(dead_code)]
-use std::{cell::RefCell, collections::HashMap, fmt, rc::Rc};
+use std::collections::HashMap;
+use std::{cell::RefCell, fmt, rc::Rc};
 
 use crate::{
     error::{ErrorType, KaguError},
-    expr::{Assign, Ast, Bin, Block, Idx, Lit, Node, Unary, Var, VarDecl},
+    expr::{Assign, Ast, Bin, Block, Idx, If, Lit, Node, Unary, Var, VarDecl},
     token::{Kind, Token},
 };
 
@@ -56,6 +57,7 @@ impl Env {
         enclosing.get(name)
     }
 
+    #[allow(clippy::redundant_pattern_matching)]
     fn assign(&mut self, name: &str, value: Value) -> Result<(), String> {
         if let Some(_) = self.values.get(name) {
             self.define(name, value);
@@ -139,8 +141,8 @@ impl Interpreter {
     }
 
     pub fn eval(&mut self, ast: &Ast) -> Result<(), KaguError> {
-        let mut indices = ast.indices.iter();
-        while let Some(idx) = indices.next() {
+        let indices = ast.indices.iter();
+        for idx in indices {
             self.eval_node(ast, *idx)?;
         }
         Ok(())
@@ -150,15 +152,28 @@ impl Interpreter {
     fn eval_node(&mut self, ast: &Ast, idx: Idx) -> Result<(), KaguError> {
         let node = ast.get(idx);
         match node {
+            Node::If(stmt) => self.eval_if(ast, stmt),
             Node::Block(block) => self.eval_block(ast, block),
             Node::Puts(idx) => self.eval_puts(ast, *idx),
             Node::VarDecl(var_decl) => self.eval_var_decl(ast, var_decl),
 
             _ => {
+                // Evalute the expression and discard the result
                 self.eval_expr(ast, idx)?;
                 Ok(())
             }
         }
+    }
+
+    fn eval_if(&mut self, ast: &Ast, stmt: &If) -> Result<(), KaguError> {
+        let cond = self.eval_expr(ast, stmt.cond)?;
+
+        if self.is_truthy(&cond) {
+            self.eval_node(ast, stmt.then_block)?;
+        } else if let Some(else_block) = stmt.else_block {
+            self.eval_node(ast, else_block)?;
+        }
+        Ok(())
     }
 
     // TODO: Implement From and To for Idx
@@ -285,13 +300,8 @@ impl Interpreter {
 
 #[cfg(test)]
 mod tests {
-    use std::default;
 
-    use crate::{
-        interpreter,
-        parser::{self, parse},
-        token::Span,
-    };
+    use crate::{parser::parse, token::Span};
 
     use super::*;
 
