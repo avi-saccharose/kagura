@@ -3,7 +3,7 @@ use std::{iter::Peekable, vec::IntoIter};
 
 use crate::{
     error::{ErrorType, KaguError},
-    expr::{Arena, Assign, Ast, Bin, Block, Idx, Lit, Node, Unary, Var, VarDecl},
+    expr::{Arena, Assign, Ast, Bin, Block, Idx, If, Lit, Node, Unary, Var, VarDecl},
     lexer,
     token::{Kind, Token},
 };
@@ -117,10 +117,31 @@ impl<'a> Parser<'a> {
 
     fn stmt(&mut self) -> Result<Idx, KaguError> {
         match self.peek_kind() {
+            Kind::If => self.stmt_if(),
             Kind::Puts => self.stmt_puts(),
             Kind::Lbrace => self.stmt_block(),
             _ => self.stmt_expr(),
         }
+    }
+
+    fn stmt_if(&mut self) -> Result<Idx, KaguError> {
+        self.advance();
+        self.consume(Kind::Lparen, "expected '(' after if")?;
+        let cond = self.expr()?;
+        self.consume(Kind::Rparen, "expected ')' after expression")?;
+
+        let then_block = self.stmt()?;
+
+        let mut else_block: Option<Idx> = None;
+        if self.matches(&[Kind::Else]) {
+            else_block = Some(self.stmt()?);
+        }
+        let idx = self.add_node(Node::If(If {
+            cond,
+            then_block,
+            else_block,
+        }));
+        Ok(idx)
     }
 
     fn stmt_puts(&mut self) -> Result<Idx, KaguError> {
@@ -429,5 +450,31 @@ mod tests {
         let input = "a = 9;";
         let mut parsed = run(input).unwrap();
         assert!(matches!(parsed.get(0), Node::Assign(..)))
+    }
+
+    #[test]
+    fn parse_if() {
+        let input = "if (true) puts true; ";
+        let mut parsed = run(input).unwrap();
+        assert!(matches!(
+            parsed.get(0),
+            Node::If(If {
+                else_block: None,
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn parse_if_else() {
+        let input = "if (true) puts true; else puts false;";
+        let mut parsed = run(input).unwrap();
+        assert!(matches!(
+            parsed.get(0),
+            Node::If(If {
+                else_block: Some(..),
+                ..
+            })
+        ));
     }
 }

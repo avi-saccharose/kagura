@@ -285,10 +285,24 @@ impl Interpreter {
 
 #[cfg(test)]
 mod tests {
-    use crate::parser::parse;
+    use std::default;
+
+    use crate::{
+        interpreter,
+        parser::{self, parse},
+        token::Span,
+    };
 
     use super::*;
 
+    fn default_token() -> Token {
+        Token {
+            span: Span { start: 0, end: 0 },
+            line: 0,
+            column: 0,
+            kind: Kind::Eof,
+        }
+    }
     #[test]
     fn env_vars() {
         let mut env = Env::new();
@@ -317,6 +331,7 @@ mod tests {
             Ok(Value::Number(-2))
         );
     }
+
     #[test]
     fn eval_unary_bang() {
         let parsed = parse("!true;").unwrap();
@@ -324,6 +339,37 @@ mod tests {
         assert_eq!(
             interpreter.eval_expr(&parsed, Idx(1)),
             Ok(Value::Bool(false))
+        );
+    }
+
+    #[test]
+    fn eval_block() {
+        let parsed = parse("var b; {var a;}").unwrap();
+        let mut interpreter = Interpreter::new();
+        interpreter.eval(&parsed).unwrap();
+        assert_eq!(interpreter.get("b", default_token()).unwrap(), Value::Nil);
+        assert!(interpreter.get("a", default_token()).is_err());
+    }
+
+    #[test]
+    fn eval_if() {
+        let parsed = parse("var a; if (true) a = true;").unwrap();
+        let mut interpreter = Interpreter::new();
+        interpreter.eval(&parsed).unwrap();
+        assert_eq!(
+            interpreter.get("a", default_token()).unwrap(),
+            Value::Bool(true)
+        );
+    }
+
+    #[test]
+    fn eval_if_else() {
+        let parsed = parse("var a; if(false) a = 1; else a = 2;").unwrap();
+        let mut interpreter = Interpreter::new();
+        interpreter.eval(&parsed).unwrap();
+        assert_eq!(
+            interpreter.get("a", default_token()).unwrap(),
+            Value::Number(2)
         );
     }
 }

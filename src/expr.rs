@@ -1,7 +1,5 @@
 #![allow(dead_code)]
 
-use std::{collections::btree_map::Range, iter, ops, option::Iter};
-
 use crate::token::Token;
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -74,6 +72,8 @@ impl<T> Arena<T> {
 pub(crate) enum Node {
     // Statements
 
+    // IF Statement
+    If(If),
     // Variable Declaration
     VarDecl(VarDecl),
     // Block Statements
@@ -93,6 +93,13 @@ pub(crate) enum Node {
     Var(Var),
     // Literal Expression
     Lit(Lit),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct If {
+    pub(crate) cond: Idx,
+    pub(crate) then_block: Idx,
+    pub(crate) else_block: Option<Idx>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
