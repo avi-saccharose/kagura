@@ -1,7 +1,5 @@
 #![allow(dead_code)]
 
-use std::default;
-
 use crate::token::Token;
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -70,10 +68,12 @@ impl<T> Arena<T> {
     }
 }
 
+// TODO: For loops
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum Node {
     // Statements
-
+    // Functions
+    Def(Def),
     // IF Statement
     If(If),
     // Variable Declaration
@@ -91,6 +91,8 @@ pub(crate) enum Node {
     Assign(Assign),
     // Binary Expression
     BinExpr(Bin),
+    // Function calls
+    Call(Call),
     // Unary Expression
     Unary(Unary),
     // Logical Expression
@@ -99,6 +101,14 @@ pub(crate) enum Node {
     Var(Var),
     // Literal Expression
     Lit(Lit),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct Def {
+    pub(crate) name: String,
+    pub(crate) arity: u16,
+    pub(crate) args: Block,
+    pub(crate) body: Idx,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -121,6 +131,8 @@ pub(crate) struct While {
     pub(crate) body: Idx,
 }
 
+// WARN: used for both blocks and function call arguments
+// need to refactor
 #[derive(Debug, Clone, PartialEq, Copy)]
 pub(crate) struct Block {
     pub(crate) start: Idx,
@@ -139,6 +151,16 @@ pub(crate) struct Bin {
     pub(crate) left: Idx,
     pub(crate) right: Idx,
     pub(crate) op: Token,
+}
+
+// TODO: currently the args uses a block statement as the args are already stored in the node and
+// we just need to access them as a Range
+// but then we run into the issue of a struct for two different purposes
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct Call {
+    pub(crate) callee: Idx,
+    pub(crate) token: Token,
+    pub(crate) args: Block,
 }
 
 #[derive(Debug, Clone, PartialEq)]

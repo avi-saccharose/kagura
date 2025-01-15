@@ -4,7 +4,8 @@ use std::{iter::Peekable, vec::IntoIter};
 use crate::{
     error::{ErrorType, KaguError},
     expr::{
-        Arena, Assign, Ast, Bin, Block, Idx, If, Lit, Logical, Node, Unary, Var, VarDecl, While,
+        Arena, Assign, Ast, Bin, Block, Call, Def, Idx, If, Lit, Logical, Node, Unary, Var,
+        VarDecl, While,
     },
     lexer,
     token::{Kind, Token},
@@ -102,17 +103,11 @@ impl<'a> Parser<'a> {
     }
 
     fn stmt_declaration(&mut self) -> Result<Idx, KaguError> {
+        if self.matches(&[Kind::Def]) {
+            return self.def_declaration();
+        }
         if self.matches(&[Kind::Var]) {
-            let token = self.consume(Kind::Ident, "Expected variable name")?;
-            let mut init: Option<Idx> = None;
-            if self.matches(&[Kind::Eq]) {
-                init = Some(self.expr()?);
-            }
-            self.consume(Kind::Semicolon, "Expected ';' after variable declaration")?;
-            let name = token.text(self.source).to_string();
-            let var_decl = VarDecl { name, token, init };
-            let idx = self.add_node(Node::VarDecl(var_decl));
-            return Ok(idx);
+            return self.var_declaration();
         }
         self.stmt()
     }
@@ -122,9 +117,64 @@ impl<'a> Parser<'a> {
             Kind::If => self.stmt_if(),
             Kind::Puts => self.stmt_puts(),
             Kind::While => self.stmt_while(),
-            Kind::Lbrace => self.stmt_block(),
+            Kind::Lbrace => {
+                self.advance();
+                self.stmt_block()
+            }
             _ => self.stmt_expr(),
         }
+    }
+
+    fn def_declaration(&mut self) -> Result<Idx, KaguError> {
+        let token = self.consume(Kind::Ident, "Expected Function name")?;
+        let name = token.text(self.source).to_string();
+        self.consume(Kind::Lparen, "Expected '(' after  Function name")?;
+        let start = self.block_start();
+        let mut end = Idx(0);
+        let mut arity: u16 = 0;
+        if !self.check(Kind::Rparen) {
+            loop {
+                end = self.expr()?;
+                match self.nodes.get(end) {
+                    Node::Var(_) => {
+                        arity += 1;
+                    }
+                    _ => return Err(self.make_error("Expected parameter name")),
+                }
+                if !self.check(Kind::Comma) {
+                    break;
+                }
+                self.advance(); // Consume the comma
+            }
+        }
+        self.consume(Kind::Rparen, "Expected ')' after parameters")?;
+
+        let args = Block { start, end };
+
+        self.consume(Kind::Lbrace, "Expected '{' before function body")?;
+        let body = self.stmt_block()?;
+        //self.consume(Kind::Rbrace, "Expected '}' after Function body")?;
+
+        let def = Node::Def(Def {
+            name,
+            arity,
+            args,
+            body,
+        });
+        Ok(self.add_node(def))
+    }
+
+    fn var_declaration(&mut self) -> Result<Idx, KaguError> {
+        let token = self.consume(Kind::Ident, "Expected variable name")?;
+        let mut init: Option<Idx> = None;
+        if self.matches(&[Kind::Eq]) {
+            init = Some(self.expr()?);
+        }
+        self.consume(Kind::Semicolon, "Expected ';' after variable declaration")?;
+        let name = token.text(self.source).to_string();
+        let var_decl = VarDecl { name, token, init };
+        let idx = self.add_node(Node::VarDecl(var_decl));
+        Ok(idx)
     }
 
     fn stmt_if(&mut self) -> Result<Idx, KaguError> {
@@ -167,8 +217,10 @@ impl<'a> Parser<'a> {
         Ok(idx)
     }
 
+    // WARN: so currently this has a very unexpected effect where every expression is evaluated
+    // we can mitigate it by either making the block a vec type
+    // or handle it in the evaluator by skipping the expressions
     fn stmt_block(&mut self) -> Result<Idx, KaguError> {
-        self.advance();
         let start = self.block_start();
         let mut end = Idx(0);
         while !self.eof() && !self.check(Kind::Rbrace) {
@@ -291,7 +343,42 @@ impl<'a> Parser<'a> {
             let expr = Node::Unary(Unary { right, op });
             return Ok(self.add_node(expr));
         }
-        self.primary()
+        self.call()
+    }
+
+    fn finish_call(&mut self, expr: Idx) -> Result<Idx, KaguError> {
+        let start = self.block_start();
+        let mut end = Idx(0);
+        if !self.check(Kind::Rparen) {
+            loop {
+                end = self.expr()?;
+                if self.matches(&[Kind::Comma]) {
+                    continue;
+                }
+                break;
+            }
+        }
+        let token = self.consume(Kind::Rparen, "Expected ')' after arguments")?;
+        let args = Block { start, end };
+        let expr = Node::Call(Call {
+            callee: expr,
+            token,
+            args,
+        });
+        Ok(self.add_node(expr))
+    }
+
+    #[allow(clippy::never_loop)]
+    fn call(&mut self) -> Result<Idx, KaguError> {
+        let mut expr = self.primary()?;
+        loop {
+            if self.matches(&[Kind::Lparen]) {
+                expr = self.finish_call(expr)?;
+                return Ok(expr);
+            }
+            break;
+        }
+        Ok(expr)
     }
 
     fn primary(&mut self) -> Result<Idx, KaguError> {
@@ -552,5 +639,19 @@ mod tests {
         let input = "while(true) puts true;";
         let mut parsed = run(input).unwrap();
         assert!(matches!(parsed.get(0), Node::While(..)))
+    }
+
+    #[test]
+    fn parse_fn_call() {
+        let input = "fn_call();";
+        let mut parsed = run(input).unwrap();
+        assert!(matches!(parsed.get(0), Node::Call(..)))
+    }
+
+    #[test]
+    fn parse_fn() {
+        let input = "def hi(arg) { puts hi; }";
+        let mut parsed = run(input).unwrap();
+        assert!(matches!(parsed.get(0), Node::Def(..)))
     }
 }
