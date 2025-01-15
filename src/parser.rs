@@ -176,7 +176,8 @@ impl<'a> Parser<'a> {
     }
 
     fn assignment(&mut self) -> Result<Idx, KaguError> {
-        let expr = self.equality()?;
+        let expr = self.or()?;
+
         if self.matches(&[Kind::Eq]) {
             let token = self.previous();
             let value = self.assignment()?;
@@ -193,6 +194,31 @@ impl<'a> Parser<'a> {
         }
         Err(self.make_error("Invalid assignment target"))
     }
+
+    fn or(&mut self) -> Result<Idx, KaguError> {
+        let mut left = self.and()?;
+
+        while self.matches(&[Kind::Or]) {
+            let op = self.previous();
+            let right = self.and()?;
+            let expr = Node::Logical(Logical { left, right, op });
+            left = self.add_node(expr);
+        }
+        Ok(left)
+    }
+
+    fn and(&mut self) -> Result<Idx, KaguError> {
+        let mut left = self.equality()?;
+
+        while self.matches(&[Kind::And]) {
+            let op = self.previous();
+            let right = self.equality()?;
+            let expr = Node::Logical(Logical { left, right, op });
+            left = self.add_node(expr);
+        }
+        Ok(left)
+    }
+
     fn equality(&mut self) -> Result<Idx, KaguError> {
         let mut left = self.comparison()?;
 
@@ -208,13 +234,13 @@ impl<'a> Parser<'a> {
 
     fn comparison(&mut self) -> Result<Idx, KaguError> {
         let mut left = self.term()?;
+
         while self.matches(&[Kind::Lt, Kind::LtEq, Kind::Gt, Kind::GtEq]) {
             let op = self.previous();
             let right = self.term()?;
             let expr = Node::BinExpr(Bin { left, right, op });
             left = self.add_node(expr);
         }
-
         Ok(left)
     }
 
@@ -227,7 +253,6 @@ impl<'a> Parser<'a> {
             let expr = Node::BinExpr(Bin { left, right, op });
             left = self.add_node(expr);
         }
-
         Ok(left)
     }
 

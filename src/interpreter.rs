@@ -212,6 +212,7 @@ impl Interpreter {
             Node::Assign(assign) => self.eval_assign(ast, assign),
             Node::BinExpr(bin) => self.eval_bin(ast, bin),
             Node::Unary(unary) => self.eval_unary(ast, unary),
+            Node::Logical(logical) => self.eval_logical(ast, logical),
             Node::Var(var) => self.eval_var(ast, var),
             Node::Lit(lit) => self.eval_lit(ast, lit),
             _ => unreachable!(),
@@ -280,6 +281,20 @@ impl Interpreter {
             }
             _ => unreachable!(),
         }
+    }
+
+    fn eval_logical(&mut self, ast: &Ast, logical: &Logical) -> Result<Value, KaguError> {
+        let left = self.eval_expr(ast, logical.left)?;
+        if logical.op.kind == Kind::Or {
+            if self.is_truthy(&left) {
+                return Ok(left);
+            }
+        } else if !self.is_truthy(&left) {
+            return Ok(left);
+        }
+
+        let right = self.eval_expr(ast, logical.right)?;
+        Ok(right)
     }
 
     fn eval_var(&mut self, _ast: &Ast, lit: &Var) -> Result<Value, KaguError> {
