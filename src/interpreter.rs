@@ -3,7 +3,7 @@ use std::{cell::RefCell, collections::HashMap, fmt, rc::Rc};
 
 use crate::{
     error::{ErrorType, KaguError},
-    expr::{Assign, Ast, Bin, Idx, Lit, Node, Unary, Var, VarDecl},
+    expr::{Assign, Ast, Bin, Block, Idx, Lit, Node, Unary, Var, VarDecl},
     token::{Kind, Token},
 };
 
@@ -150,6 +150,7 @@ impl Interpreter {
     fn eval_node(&mut self, ast: &Ast, idx: Idx) -> Result<(), KaguError> {
         let node = ast.get(idx);
         match node {
+            Node::Block(block) => self.eval_block(ast, block),
             Node::Puts(idx) => self.eval_puts(ast, *idx),
             Node::VarDecl(var_decl) => self.eval_var_decl(ast, var_decl),
 
@@ -158,6 +159,20 @@ impl Interpreter {
                 Ok(())
             }
         }
+    }
+
+    // TODO: Implement From and To for Idx
+    fn eval_block(&mut self, ast: &Ast, block: &Block) -> Result<(), KaguError> {
+        let start = block.start;
+        let end = block.end;
+
+        let previous = std::mem::replace(&mut self.env, Rc::new(RefCell::new(Env::new())));
+        self.env.borrow_mut().enclosing = Some(Rc::clone(&previous));
+        for node in start.0..=end.0 {
+            self.eval_node(ast, Idx(node))?;
+        }
+        let _ = std::mem::replace(&mut self.env, previous);
+        Ok(())
     }
 
     fn eval_puts(&mut self, ast: &Ast, idx: Idx) -> Result<(), KaguError> {
@@ -189,7 +204,14 @@ impl Interpreter {
     }
 
     fn eval_assign(&mut self, ast: &Ast, assign: &Assign) -> Result<Value, KaguError> {
-        let name = &assign.name;
+        let name = {
+            let assign = ast.get(assign.name);
+            if let Node::Var(var) = assign {
+                &var.name
+            } else {
+                unreachable!()
+            }
+        };
         let value = self.eval_expr(ast, assign.value)?;
         let token = assign.token;
         self.assign(name, value, token)?;

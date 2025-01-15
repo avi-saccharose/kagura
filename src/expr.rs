@@ -1,5 +1,7 @@
 #![allow(dead_code)]
 
+use std::{collections::btree_map::Range, iter, ops, option::Iter};
+
 use crate::token::Token;
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -9,6 +11,14 @@ pub(crate) struct Idx(pub usize);
 pub(crate) struct Arena<T> {
     pub(crate) data: Vec<T>,
 }
+
+/*
+impl From<Block> for ops::Range<Idx> {
+    fn from(block: Block) -> Self {
+        block.start..block.end
+    }
+}
+*/
 
 #[derive(Debug, Clone)]
 pub struct Ast {
@@ -29,6 +39,10 @@ impl Ast {
     pub(crate) fn get(&self, idx: Idx) -> &Node {
         self.nodes.get(idx)
     }
+
+    pub(crate) fn get_from_range(&self, start: Idx, end: Idx) -> &[Node] {
+        self.nodes.get_from_range(start, end)
+    }
 }
 
 impl<T> Arena<T> {
@@ -45,6 +59,10 @@ impl<T> Arena<T> {
 
     pub(crate) fn get(&self, idx: Idx) -> &T {
         &self.data[idx.0]
+    }
+
+    pub(crate) fn get_from_range(&self, start: Idx, end: Idx) -> &[T] {
+        &self.data[start.0..end.0]
     }
 
     pub(crate) fn pop(&mut self) -> Option<T> {
@@ -84,7 +102,7 @@ pub(crate) struct VarDecl {
     pub(crate) init: Option<Idx>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Copy)]
 pub(crate) struct Block {
     pub(crate) start: Idx,
     pub(crate) end: Idx,
@@ -92,7 +110,7 @@ pub(crate) struct Block {
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct Assign {
-    pub(crate) name: String,
+    pub(crate) name: Idx,
     pub(crate) token: Token,
     pub(crate) value: Idx,
 }

@@ -154,9 +154,6 @@ impl<'a> Parser<'a> {
         self.assignment()
     }
 
-    // TODO: currently when checking for assignment, if it is of type var
-    // we create a new assignment struct by copying the name of the var
-    // very inefficiently and the var remains garbage value
     fn assignment(&mut self) -> Result<Idx, KaguError> {
         let expr = self.equality()?;
         if self.matches(&[Kind::Eq]) {
@@ -169,10 +166,9 @@ impl<'a> Parser<'a> {
         Ok(expr)
     }
 
-    fn check_assignment(&mut self, idx: Idx) -> Result<String, KaguError> {
-        if let Node::Var(var) = self.nodes.get(idx) {
-            let name = var.name.clone();
-            return Ok(name);
+    fn check_assignment(&mut self, idx: Idx) -> Result<Idx, KaguError> {
+        if let Node::Var(_) = self.nodes.get(idx) {
+            return Ok(idx);
         }
         Err(self.make_error("Invalid assignment target"))
     }

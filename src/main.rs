@@ -24,12 +24,13 @@ fn print_help() {
     println!("Kagura Compiler");
     println!("-help: Show this");
     println!("-env: Print the env stack");
+    println!("-ast: Toggle print ast nodes");
     println!("-q: Exit the repl");
 }
 
 fn repl() {
     let mut interpreter = Interpreter::new();
-
+    let mut print_ast = false;
     println!("Kagura Compiler input '-help' for help");
 
     loop {
@@ -47,6 +48,11 @@ fn repl() {
             }
             "-env" => {
                 dbg!(&interpreter.env);
+                continue;
+            }
+            "-ast" => {
+                print_ast = !print_ast;
+                println!("print ast = {print_ast:}");
                 continue;
             }
             "-q" => {
@@ -67,6 +73,10 @@ fn repl() {
                 continue;
             }
             Ok(res) => {
+                if print_ast {
+                    dbg!(&res);
+                }
+
                 if let Err(e) = interpreter.eval(&res) {
                     print_error(e, &line);
                 }
