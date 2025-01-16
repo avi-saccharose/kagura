@@ -80,8 +80,11 @@ pub(crate) enum Node {
     VarDecl(VarDecl),
     // While Statements
     While(While),
+    // Return Statement
+    Return(Return),
     // Block Statements
-    Block(Block),
+    // Also used for def param and args
+    Block(Vec<Idx>),
     // Puts Statement
     Puts(Idx),
 
@@ -131,12 +134,47 @@ pub(crate) struct While {
     pub(crate) body: Idx,
 }
 
+#[derive(Debug, Clone, PartialEq, Copy)]
+pub(crate) struct Return {
+    pub(crate) token: Token,
+    pub(crate) expr: Option<Idx>,
+}
+
 // WARN: used for both blocks and function call arguments
 // need to refactor
 #[derive(Debug, Clone, PartialEq, Copy)]
 pub(crate) struct Block {
     pub(crate) start: Idx,
     pub(crate) end: Idx,
+}
+
+impl Block {
+    pub(crate) fn iter(&self) -> BlockIterator {
+        BlockIterator {
+            index: self.start.0,
+            block: self,
+        }
+    }
+}
+
+pub(crate) struct BlockIterator<'a> {
+    index: usize,
+    block: &'a Block,
+}
+
+impl Iterator for BlockIterator<'_> {
+    type Item = Idx;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.block.end.0 == 0 {
+            return None;
+        }
+        if self.index > self.block.end.0 {
+            return None;
+        }
+        self.index += 1;
+        Some(Idx(self.index - 1))
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -160,7 +198,7 @@ pub(crate) struct Bin {
 pub(crate) struct Call {
     pub(crate) callee: Idx,
     pub(crate) token: Token,
-    pub(crate) args: Block,
+    pub(crate) args: Vec<Idx>,
 }
 
 #[derive(Debug, Clone, PartialEq)]

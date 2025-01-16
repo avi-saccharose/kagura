@@ -3,7 +3,8 @@ use std::collections::HashMap;
 use std::{cell::RefCell, rc::Rc};
 
 use crate::error::{ErrorType, KaguError};
-use crate::expr::{Call, Def, While};
+use crate::expr::{Call, Def, Return, While};
+use crate::parser::parse;
 use crate::values::KaguDef;
 use crate::{
     expr::{Assign, Ast, Bin, Block, Idx, If, Lit, Logical, Node, Unary, Var, VarDecl},
@@ -34,7 +35,7 @@ impl Env {
             return Ok(value.clone());
         }
         if self.enclosing.is_none() {
-            dbg!(&self);
+            dbg!(self);
             return Err(format!("undefined variable {}", name));
         }
         let enclosing = self.enclosing.as_ref().unwrap().borrow();
@@ -60,12 +61,14 @@ impl Env {
 #[derive(Debug)]
 pub(crate) struct Interpreter {
     pub env: Rc<RefCell<Env>>,
+    ret_value: Option<Value>,
 }
 
 impl Interpreter {
     pub fn new() -> Self {
         Self {
             env: Rc::new(RefCell::new(Env::new())),
+            ret_value: None,
         }
     }
 
@@ -138,11 +141,14 @@ impl Interpreter {
         match node {
             Node::Def(def) => self.eval_def(ast, def),
             Node::If(stmt) => self.eval_if(ast, stmt),
-            Node::Block(block) => self.eval_block(ast, block),
+            Node::Block(block) => {
+                // Empty block
+                self.eval_block(ast, block)
+            }
             Node::Puts(idx) => self.eval_puts(ast, *idx),
             Node::VarDecl(var_decl) => self.eval_var_decl(ast, var_decl),
             Node::While(stmt) => self.eval_while(ast, stmt),
-
+            Node::Return(stmt) => self.eval_return(ast, stmt),
             _ => {
                 // Evalute the expression and discard the result
                 self.eval_expr(ast, idx)?;
@@ -155,7 +161,6 @@ impl Interpreter {
     fn eval_def(&mut self, _ast: &Ast, def: &Def) -> Result<(), KaguError> {
         let name = def.name.clone();
         let args = def.args;
-        dbg!(args);
         let arity = def.arity;
         let body = def.body;
         let def = Value::Def(KaguDef {
@@ -179,25 +184,18 @@ impl Interpreter {
         Ok(())
     }
 
-    fn eval_block(&mut self, ast: &Ast, block: &Block) -> Result<(), KaguError> {
+    fn eval_block(&mut self, ast: &Ast, block: &[Idx]) -> Result<(), KaguError> {
         self.execute_block(ast, block, Env::new())
     }
 
-    // TODO: Implement From and To for Idx
     // WARN: Every node from start to end is evaluated, this can and might produce unexpected
     // results and also wastes cycles and these expressions are evaluated again when they are called
     // by the actual nodes that reference them
-    fn execute_block(&mut self, ast: &Ast, block: &Block, env: Env) -> Result<(), KaguError> {
-        let start = block.start;
-        let end = block.end;
-
-        if start == end {
-            return Ok(());
-        }
+    fn execute_block(&mut self, ast: &Ast, block: &[Idx], env: Env) -> Result<(), KaguError> {
         let previous = std::mem::replace(&mut self.env, Rc::new(RefCell::new(env)));
         self.env.borrow_mut().enclosing = Some(Rc::clone(&previous));
-        for node in start.0..=end.0 {
-            self.eval_node(ast, Idx(node))?;
+        for node in block.iter() {
+            self.eval_node(ast, *node)?;
         }
         let _ = std::mem::replace(&mut self.env, previous);
         Ok(())
@@ -229,6 +227,25 @@ impl Interpreter {
         }
 
         Ok(())
+    }
+
+    fn placeholder_error(&self, token: Token) -> KaguError {
+        KaguError {
+            start: token.span.start,
+            line: token.line,
+            column: token.column,
+            msg: "implicit use of return outside function".to_string(),
+            error_type: ErrorType::Return,
+        }
+    }
+
+    fn eval_return(&mut self, ast: &Ast, ret: &Return) -> Result<(), KaguError> {
+        if let Some(expr) = ret.expr {
+            if let Ok(val) = self.eval_expr(ast, expr) {
+                self.ret_value = Some(val);
+            }
+        }
+        Err(self.placeholder_error(ret.token))
     }
 
     fn eval_expr(&mut self, ast: &Ast, idx: Idx) -> Result<Value, KaguError> {
@@ -300,20 +317,17 @@ impl Interpreter {
     fn eval_call(&mut self, ast: &Ast, call: &Call) -> Result<Value, KaguError> {
         let callee = self.ident_string(ast, call.callee);
         let def = self.get(callee, call.token)?;
+
         if let Value::Def(def) = def {
             let mut args: Vec<Value> = Vec::new();
 
-            // TODO: Fix this abomination
-            for idx in call.args.start.0..=call.args.end.0 {
-                args.push(self.eval_expr(ast, Idx(idx))?);
-            }
-
-            if def.arity != args.len() as u16 {
+            if def.arity != call.args.len() as u16 {
                 return Err(self.make_error("Number of arguments do not match", call.token));
             }
-
-            self.call(ast, def, args)?;
-            return Ok(Value::Nil);
+            for idx in call.args.iter() {
+                args.push(self.eval_expr(ast, *idx)?);
+            }
+            return self.call(ast, def, args);
         }
         Err(self.make_error("can only call functions", call.token))
     }
@@ -322,18 +336,28 @@ impl Interpreter {
         let mut env = Env::new();
         let mut idx = 0;
         if def.arity != 0 {
+            // TODO: def.iter() currently doesnt work as it returns None
             for param in def.args.start.0..=def.args.end.0 {
                 let name = self.ident_string(ast, Idx(param));
                 env.define(name, args[idx].clone());
                 idx += 1;
             }
         }
+
         let block = match ast.get(def.body) {
             Node::Block(block) => block,
             _ => unreachable!(),
         };
-        self.execute_block(ast, block, env)?;
-        Ok(Value::Nil)
+
+        match self.execute_block(ast, block, env) {
+            Err(e) => {
+                if e.error_type == ErrorType::Return {
+                    return Ok(self.ret_value.take().unwrap());
+                }
+                Err(e)
+            }
+            Ok(_) => Ok(Value::Nil),
+        }
     }
 
     fn eval_unary(&mut self, ast: &Ast, unary: &Unary) -> Result<Value, KaguError> {
@@ -385,7 +409,7 @@ impl Interpreter {
 #[cfg(test)]
 mod tests {
 
-    use crate::{interpreter, parser::parse, token::Span};
+    use crate::{parser::parse, token::Span};
 
     use super::*;
 

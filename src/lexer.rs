@@ -207,6 +207,7 @@ impl<'a> Lexer<'a> {
             "and" => Kind::And,
             "or" => Kind::Or,
             "puts" => Kind::Puts,
+            "return" => Kind::Return,
             _ => Kind::Ident,
         };
         Ok(self.make_token(kind, start))

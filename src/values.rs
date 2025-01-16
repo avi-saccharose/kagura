@@ -12,6 +12,9 @@ pub enum Value {
     Nil,
 }
 
+// TODO: Since now we store the ast indices in arguments and body, our repl crashes when calling
+// functions
+//
 #[derive(Debug, Clone, PartialEq)]
 pub struct KaguDef {
     pub name: String,

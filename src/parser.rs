@@ -4,7 +4,7 @@ use std::{iter::Peekable, vec::IntoIter};
 use crate::{
     error::{ErrorType, KaguError},
     expr::{
-        Arena, Assign, Ast, Bin, Block, Call, Def, Idx, If, Lit, Logical, Node, Unary, Var,
+        Arena, Assign, Ast, Bin, Block, Call, Def, Idx, If, Lit, Logical, Node, Return, Unary, Var,
         VarDecl, While,
     },
     lexer,
@@ -117,6 +117,7 @@ impl<'a> Parser<'a> {
             Kind::If => self.stmt_if(),
             Kind::Puts => self.stmt_puts(),
             Kind::While => self.stmt_while(),
+            Kind::Return => self.stmt_return(),
             Kind::Lbrace => {
                 self.advance();
                 self.stmt_block()
@@ -221,14 +222,24 @@ impl<'a> Parser<'a> {
     // we can mitigate it by either making the block a vec type
     // or handle it in the evaluator by skipping the expressions
     fn stmt_block(&mut self) -> Result<Idx, KaguError> {
-        let start = self.block_start();
-        let mut end = Idx(0);
+        let mut stmts = Vec::new();
         while !self.eof() && !self.check(Kind::Rbrace) {
-            end = self.stmt_declaration()?;
+            stmts.push(self.stmt_declaration()?);
         }
 
         self.consume(Kind::Rbrace, "expect '}'")?;
-        let idx = self.add_node(Node::Block(Block { start, end }));
+        let idx = self.add_node(Node::Block(stmts));
+        Ok(idx)
+    }
+
+    fn stmt_return(&mut self) -> Result<Idx, KaguError> {
+        let token = self.advance().unwrap();
+        let mut expr: Option<Idx> = None;
+        if !self.check(Kind::Semicolon) {
+            expr = Some(self.expr()?);
+        }
+        self.consume(Kind::Semicolon, "Expected ';' after return")?;
+        let idx = self.add_node(Node::Return(Return { token, expr }));
         Ok(idx)
     }
 
@@ -347,11 +358,10 @@ impl<'a> Parser<'a> {
     }
 
     fn finish_call(&mut self, expr: Idx) -> Result<Idx, KaguError> {
-        let start = self.block_start();
-        let mut end = Idx(0);
+        let mut args = Vec::new();
         if !self.check(Kind::Rparen) {
             loop {
-                end = self.expr()?;
+                args.push(self.expr()?);
                 if self.matches(&[Kind::Comma]) {
                     continue;
                 }
@@ -359,7 +369,6 @@ impl<'a> Parser<'a> {
             }
         }
         let token = self.consume(Kind::Rparen, "Expected ')' after arguments")?;
-        let args = Block { start, end };
         let expr = Node::Call(Call {
             callee: expr,
             token,
@@ -653,5 +662,12 @@ mod tests {
         let input = "def hi(arg) { puts hi; }";
         let mut parsed = run(input).unwrap();
         assert!(matches!(parsed.get(0), Node::Def(..)))
+    }
+
+    #[test]
+    fn parse_ret() {
+        let input = "return 1;";
+        let mut parsed = run(input).unwrap();
+        assert!(matches!(parsed.get(0), Node::Return(..)))
     }
 }

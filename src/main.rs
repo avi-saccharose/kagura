@@ -1,7 +1,9 @@
 use std::io::{self, Read, Write};
 
 use error::KaguError;
+use expr::{Ast, Idx};
 use interpreter::Interpreter;
+use parser::parse;
 mod error;
 mod expr;
 mod interpreter;
@@ -9,10 +11,14 @@ mod lexer;
 mod parser;
 mod token;
 mod values;
+
 fn print_error(e: KaguError, source: &str) {
-    let line = e.line as usize;
+    let mut line = e.line as usize;
     let column = e.column as usize;
-    let text = source.lines().nth(line - 1).unwrap();
+    dbg!(source);
+    dbg!(line);
+    line = line.saturating_sub(1);
+    let text = source.lines().nth(line).unwrap();
     eprintln!("{}", e);
     eprintln!("{} | {}\n", line, text);
 
@@ -23,6 +29,8 @@ fn print_error(e: KaguError, source: &str) {
 fn print_help() {
     println!("Kagura Compiler");
     println!("-help: Show this");
+    println!("-tree: Show entire ast tree");
+    println!("-history: Print history");
     println!("-env: Print the env stack");
     println!("-ast: Toggle print ast nodes");
     println!("-q: Exit the repl");
@@ -31,6 +39,8 @@ fn print_help() {
 fn repl() {
     let mut interpreter = Interpreter::new();
     let mut print_ast = false;
+    let mut history = String::new();
+    let mut ast = Ast::default();
     println!("Kagura Compiler input '-help' for help");
 
     loop {
@@ -44,6 +54,14 @@ fn repl() {
         match line.trim_ascii() {
             "-help" => {
                 print_help();
+                continue;
+            }
+            "-tree" => {
+                dbg!(&ast);
+                continue;
+            }
+            "-history" => {
+                println!("{history}");
                 continue;
             }
             "-env" => {
@@ -66,8 +84,8 @@ fn repl() {
             continue;
         }
 
-        let ast = parser::parse(&line);
-        match ast {
+        let parsed = parser::parse(&line);
+        match parsed {
             Err(e) => {
                 print_error(e, &line);
                 continue;
@@ -76,13 +94,28 @@ fn repl() {
                 if print_ast {
                     dbg!(&res);
                 }
-
-                if let Err(e) = interpreter.eval(&res) {
-                    print_error(e, &line);
+                history.push_str(&line);
+                ast = rebuild_tree(ast, &history, res);
+                if let Err(e) = interpreter.eval(&ast) {
+                    print_error(e, &history);
                 }
             }
         }
     }
+}
+
+fn rebuild_tree(ast: Ast, source: &str, mut new_ast: Ast) -> Ast {
+    let indices: Vec<Idx> = new_ast
+        .indices
+        .iter_mut()
+        .map(|idx| {
+            let idx = idx.0 + ast.nodes.data.len();
+            Idx(idx)
+        })
+        .collect();
+    let mut ast = parse(source).unwrap();
+    ast.indices = indices;
+    ast
 }
 
 fn read_file(name: &str) -> io::Result<String> {

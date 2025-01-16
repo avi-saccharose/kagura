@@ -15,6 +15,7 @@ pub(crate) enum ErrorType {
     Lexer,
     Parse,
     Runtime,
+    Return,
 }
 
 impl Error for KaguError {}
