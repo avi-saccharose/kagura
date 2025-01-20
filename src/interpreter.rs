@@ -337,8 +337,9 @@ impl Interpreter {
         let mut idx = 0;
         if def.arity != 0 {
             // TODO: def.iter() currently doesnt work as it returns None
-            for param in def.args.start.0..=def.args.end.0 {
-                let name = self.ident_string(ast, Idx(param));
+            //for param in def.args.start.0..=def.args.end.0 {
+            for param in def.args.iter() {
+                let name = self.ident_string(ast, param);
                 env.define(name, args[idx].clone());
                 idx += 1;
             }

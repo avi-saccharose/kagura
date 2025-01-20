@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::expr::{Block, Idx};
+use crate::expr::{Idx, Range};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
@@ -12,14 +12,13 @@ pub enum Value {
     Nil,
 }
 
-// TODO: Since now we store the ast indices in arguments and body, our repl crashes when calling
+// TODO: Since we store the ast indices in arguments and body, our repl crashes when calling
 // functions
-//
 #[derive(Debug, Clone, PartialEq)]
 pub struct KaguDef {
     pub name: String,
     pub arity: u16,
-    pub args: Block,
+    pub args: Range,
     pub body: Idx,
 }
 

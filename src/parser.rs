@@ -4,7 +4,7 @@ use std::{iter::Peekable, vec::IntoIter};
 use crate::{
     error::{ErrorType, KaguError},
     expr::{
-        Arena, Assign, Ast, Bin, Block, Call, Def, Idx, If, Lit, Logical, Node, Return, Unary, Var,
+        Arena, Assign, Ast, Bin, Call, Def, Idx, If, Lit, Logical, Node, Range, Return, Unary, Var,
         VarDecl, While,
     },
     lexer,
@@ -150,11 +150,12 @@ impl<'a> Parser<'a> {
         }
         self.consume(Kind::Rparen, "Expected ')' after parameters")?;
 
-        let args = Block { start, end };
+        // We cam use range instead of resorting to a vec as the args only accept identifers
+        // meaning we can be sure the range corresponds to the number of arguments
+        let args = Range { start, end };
 
         self.consume(Kind::Lbrace, "Expected '{' before function body")?;
         let body = self.stmt_block()?;
-        //self.consume(Kind::Rbrace, "Expected '}' after Function body")?;
 
         let def = Node::Def(Def {
             name,
@@ -162,6 +163,7 @@ impl<'a> Parser<'a> {
             args,
             body,
         });
+
         Ok(self.add_node(def))
     }
 
@@ -218,9 +220,6 @@ impl<'a> Parser<'a> {
         Ok(idx)
     }
 
-    // WARN: so currently this has a very unexpected effect where every expression is evaluated
-    // we can mitigate it by either making the block a vec type
-    // or handle it in the evaluator by skipping the expressions
     fn stmt_block(&mut self) -> Result<Idx, KaguError> {
         let mut stmts = Vec::new();
         while !self.eof() && !self.check(Kind::Rbrace) {

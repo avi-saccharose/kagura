@@ -110,7 +110,7 @@ pub(crate) enum Node {
 pub(crate) struct Def {
     pub(crate) name: String,
     pub(crate) arity: u16,
-    pub(crate) args: Block,
+    pub(crate) args: Range,
     pub(crate) body: Idx,
 }
 
@@ -140,35 +140,31 @@ pub(crate) struct Return {
     pub(crate) expr: Option<Idx>,
 }
 
-// WARN: used for both blocks and function call arguments
-// need to refactor
+// TODO: there should be a better name for this
 #[derive(Debug, Clone, PartialEq, Copy)]
-pub(crate) struct Block {
+pub(crate) struct Range {
     pub(crate) start: Idx,
     pub(crate) end: Idx,
 }
 
-impl Block {
-    pub(crate) fn iter(&self) -> BlockIterator {
-        BlockIterator {
+impl Range {
+    pub(crate) fn iter(&self) -> RangeIterator {
+        RangeIterator {
             index: self.start.0,
             block: self,
         }
     }
 }
 
-pub(crate) struct BlockIterator<'a> {
+pub(crate) struct RangeIterator<'a> {
     index: usize,
-    block: &'a Block,
+    block: &'a Range,
 }
 
-impl Iterator for BlockIterator<'_> {
+impl Iterator for RangeIterator<'_> {
     type Item = Idx;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.block.end.0 == 0 {
-            return None;
-        }
         if self.index > self.block.end.0 {
             return None;
         }
@@ -191,9 +187,7 @@ pub(crate) struct Bin {
     pub(crate) op: Token,
 }
 
-// TODO: currently the args uses a block statement as the args are already stored in the node and
-// we just need to access them as a Range
-// but then we run into the issue of a struct for two different purposes
+// INFO: vec is used instead of a range as range executes every expression in its range
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct Call {
     pub(crate) callee: Idx,
@@ -220,6 +214,7 @@ pub(crate) struct Var {
     pub(crate) token: Token,
 }
 
+// TODO: remove ident
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum Lit {
     Ident(String),
