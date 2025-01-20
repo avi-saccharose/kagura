@@ -188,14 +188,16 @@ impl Interpreter {
         self.execute_block(ast, block, Env::new())
     }
 
-    // WARN: Every node from start to end is evaluated, this can and might produce unexpected
-    // results and also wastes cycles and these expressions are evaluated again when they are called
-    // by the actual nodes that reference them
+    // INFO: We catch err and replace env as return calls invokes an error which is not truly an
+    // error
     fn execute_block(&mut self, ast: &Ast, block: &[Idx], env: Env) -> Result<(), KaguError> {
         let previous = std::mem::replace(&mut self.env, Rc::new(RefCell::new(env)));
         self.env.borrow_mut().enclosing = Some(Rc::clone(&previous));
         for node in block.iter() {
-            self.eval_node(ast, *node)?;
+            if let Err(e) = self.eval_node(ast, *node) {
+                let _ = std::mem::replace(&mut self.env, previous);
+                return Err(e);
+            }
         }
         let _ = std::mem::replace(&mut self.env, previous);
         Ok(())
