@@ -4,10 +4,9 @@ use std::{cell::RefCell, rc::Rc};
 
 use crate::error::{ErrorType, KaguError};
 use crate::expr::{Call, Def, Return, While};
-use crate::parser::parse;
 use crate::values::KaguDef;
 use crate::{
-    expr::{Assign, Ast, Bin, Block, Idx, If, Lit, Logical, Node, Unary, Var, VarDecl},
+    expr::{Assign, Ast, Bin, Idx, If, Lit, Logical, Node, Unary, Var, VarDecl},
     token::{Kind, Token},
     values::Value,
 };
@@ -269,10 +268,9 @@ impl Interpreter {
     fn ident_string<'a>(&mut self, ast: &'a Ast, idx: Idx) -> &'a String {
         let assign = ast.get(idx);
         if let Node::Var(var) = assign {
-            &var.name
-        } else {
-            unreachable!()
+            return &var.name;
         }
+        unreachable!()
     }
 
     fn eval_assign(&mut self, ast: &Ast, assign: &Assign) -> Result<Value, KaguError> {
@@ -552,6 +550,26 @@ mod tests {
         assert_eq!(
             interpreter.get("x", default_token()).unwrap(),
             Value::Number(9)
+        );
+    }
+
+    #[test]
+    fn eval_fibonacci_program() {
+        let program = parse(
+            "
+            def fib(n) {
+            if (n <= 1) return n;
+            return fib(n - 1) + fib(n - 2);
+            }
+            var a = fib(15);
+            ",
+        )
+        .unwrap();
+        let mut interpreter = Interpreter::new();
+        interpreter.eval(&program).unwrap();
+        assert_eq!(
+            interpreter.get("a", default_token()).unwrap(),
+            Value::Number(610)
         );
     }
 }
