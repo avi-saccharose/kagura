@@ -1,6 +1,10 @@
 use std::fmt;
 
-use crate::expr::{Idx, Range};
+use crate::{
+    error::KaguError,
+    expr::{Idx, Range},
+    interpreter::Env,
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
@@ -9,6 +13,7 @@ pub enum Value {
     Bool(bool),
     Ident(String),
     Def(KaguDef),
+    NativeDef(NativeDef),
     Nil,
 }
 
@@ -22,6 +27,37 @@ pub struct KaguDef {
     pub body: Idx,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct NativeDef {
+    pub name: &'static str,
+    pub arity: u16,
+    pub args: Option<Vec<String>>,
+    pub exec: fn(env: &mut Env, &[Value]) -> Result<Value, KaguError>,
+}
+
+pub trait Callable {
+    fn arity(&self) -> u16;
+    fn call(&mut self, env: &mut Env, args: &[Value]) -> Result<Value, KaguError>;
+}
+
+impl Callable for KaguDef {
+    fn arity(&self) -> u16 {
+        self.arity
+    }
+    fn call(&mut self, env: &mut Env, args: &[Value]) -> Result<Value, KaguError> {
+        todo!()
+    }
+}
+
+impl Callable for NativeDef {
+    fn arity(&self) -> u16 {
+        self.arity
+    }
+    fn call(&mut self, env: &mut Env, args: &[Value]) -> Result<Value, KaguError> {
+        (self.exec)(env, args)
+    }
+}
+
 impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
@@ -30,6 +66,7 @@ impl fmt::Display for Value {
             Self::Nil => write!(f, "nil"),
             Self::Ident(str) | Self::String(str) => write!(f, "{str}"),
             Self::Def(def) => write!(f, "<Def>{}", def.name),
+            Self::NativeDef(def) => write!(f, "<NativeDef> {}", def.name),
         }
     }
 }

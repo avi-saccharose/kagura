@@ -4,7 +4,7 @@ use std::{cell::RefCell, rc::Rc};
 
 use crate::error::{ErrorType, KaguError};
 use crate::expr::{Call, Def, Return, While};
-use crate::values::KaguDef;
+use crate::values::{KaguDef, NativeDef};
 use crate::{
     expr::{Assign, Ast, Bin, Idx, If, Lit, Logical, Node, Unary, Var, VarDecl},
     token::{Kind, Token},
@@ -55,6 +55,28 @@ impl Env {
     }
 }
 
+impl Default for Env {
+    fn default() -> Self {
+        let mut values = HashMap::new();
+        values.insert(
+            "time".to_string(),
+            Value::NativeDef(NativeDef {
+                name: "time",
+                arity: 0,
+                args: None,
+                exec: |_, _| -> Result<Value, KaguError> {
+                    let start = std::time::SystemTime::now();
+                    let since = start.duration_since(std::time::UNIX_EPOCH).unwrap();
+                    Ok(Value::Number(since.as_millis() as i64))
+                },
+            }),
+        );
+        Self {
+            values,
+            enclosing: None,
+        }
+    }
+}
 // TODO: Way to store reference to the ast that can live shorter than the Interpreter
 // Another option would be to directly own the ast
 #[derive(Debug)]
@@ -66,7 +88,7 @@ pub(crate) struct Interpreter {
 impl Interpreter {
     pub fn new() -> Self {
         Self {
-            env: Rc::new(RefCell::new(Env::new())),
+            env: Rc::new(RefCell::new(Default::default())),
             ret_value: None,
         }
     }
@@ -314,6 +336,7 @@ impl Interpreter {
         }
     }
 
+    // TODO: Refactor this
     fn eval_call(&mut self, ast: &Ast, call: &Call) -> Result<Value, KaguError> {
         let callee = self.ident_string(ast, call.callee);
         let def = self.get(callee, call.token)?;
@@ -328,16 +351,36 @@ impl Interpreter {
                 args.push(self.eval_expr(ast, *idx)?);
             }
             return self.call(ast, def, args);
+        } else if let Value::NativeDef(def) = def {
+            let mut args: Vec<Value> = Vec::with_capacity(def.arity as usize);
+            if def.arity != call.args.len() as u16 {
+                return Err(self.make_error("Number of arguments dp not match", call.token));
+            }
+            for idx in call.args.iter() {
+                args.push(self.eval_expr(ast, *idx)?);
+            }
+            return self.call_native(ast, def, args);
         }
         Err(self.make_error("can only call functions", call.token))
     }
 
+    // INFO: handle args, env
+    fn call_native(
+        &mut self,
+        ast: &Ast,
+        def: NativeDef,
+        args: Vec<Value>,
+    ) -> Result<Value, KaguError> {
+        let mut env = Env::new();
+        (def.exec)(&mut env, &args)
+        // for (args, value) in
+    }
+
+    // TODO: Refactor
     fn call(&mut self, ast: &Ast, def: KaguDef, args: Vec<Value>) -> Result<Value, KaguError> {
         let mut env = Env::new();
         let mut idx = 0;
         if def.arity != 0 {
-            // TODO: def.iter() currently doesnt work as it returns None
-            //for param in def.args.start.0..=def.args.end.0 {
             for param in def.args.iter() {
                 let name = self.ident_string(ast, param);
                 env.define(name, args[idx].clone());
