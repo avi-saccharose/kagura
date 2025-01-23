@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 use std::collections::HashMap;
+use std::env;
 use std::{cell::RefCell, rc::Rc};
 
 use crate::error::{ErrorType, KaguError};
@@ -29,12 +30,17 @@ impl Env {
         self.values.insert(name.to_string(), value);
     }
 
+    fn enclose(enclosing: Rc<RefCell<Env>>) -> Self {
+        let mut env = Self::new();
+        env.enclosing = Some(enclosing);
+        env
+    }
+
     fn get(&self, name: &str) -> Result<Value, String> {
         if let Some(value) = self.values.get(name) {
             return Ok(value.clone());
         }
         if self.enclosing.is_none() {
-            dbg!(self);
             return Err(format!("undefined variable {}", name));
         }
         let enclosing = self.enclosing.as_ref().unwrap().borrow();
@@ -184,9 +190,11 @@ impl Interpreter {
         let args = def.args;
         let arity = def.arity;
         let body = def.body;
+        let enclosing = Rc::clone(&self.env);
         let def = Value::Def(KaguDef {
             name: name.clone(),
             args,
+            enclosing,
             arity,
             body,
         });
@@ -206,14 +214,13 @@ impl Interpreter {
     }
 
     fn eval_block(&mut self, ast: &Ast, block: &[Idx]) -> Result<(), KaguError> {
-        self.execute_block(ast, block, Env::new())
+        self.execute_block(ast, block, Env::enclose(Rc::clone(&self.env)))
     }
 
     // INFO: We catch err and replace env as return calls invokes an error which is not truly an
     // error
     fn execute_block(&mut self, ast: &Ast, block: &[Idx], env: Env) -> Result<(), KaguError> {
         let previous = std::mem::replace(&mut self.env, Rc::new(RefCell::new(env)));
-        self.env.borrow_mut().enclosing = Some(Rc::clone(&previous));
         for node in block.iter() {
             if let Err(e) = self.eval_node(ast, *node) {
                 let _ = std::mem::replace(&mut self.env, previous);
@@ -378,7 +385,7 @@ impl Interpreter {
 
     // TODO: Refactor
     fn call(&mut self, ast: &Ast, def: KaguDef, args: Vec<Value>) -> Result<Value, KaguError> {
-        let mut env = Env::new();
+        let mut env = Env::enclose(def.enclosing);
         let mut idx = 0;
         if def.arity != 0 {
             for param in def.args.iter() {
@@ -615,5 +622,29 @@ mod tests {
             interpreter.get("a", default_token()).unwrap(),
             Value::Number(610)
         );
+    }
+
+    #[test]
+    fn eval_closure() {
+        let program = parse(
+            "
+            def make() {
+	              var i = 0;
+                def count() {
+                    i = i + 1;
+		                puts i;
+	              }
+	              return count;
+            }
+
+
+            var counter = make();
+            counter();
+            counter();
+            ",
+        )
+        .unwrap();
+        let mut interpreter = Interpreter::new();
+        assert!(interpreter.eval(&program).is_ok());
     }
 }

@@ -144,7 +144,7 @@ fn run_file(name: &str) {
                     std::process::exit(3);
                 }
                 Ok(res) => {
-                    dbg!(&res);
+                    //      dbg!(&res);
                     if let Err(e) = interpreter.eval(&res) {
                         print_error(e, &source);
                     }

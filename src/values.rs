@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{cell::RefCell, fmt, rc::Rc};
 
 use crate::{
     error::KaguError,
@@ -22,6 +22,7 @@ pub enum Value {
 #[derive(Debug, Clone, PartialEq)]
 pub struct KaguDef {
     pub name: String,
+    pub enclosing: Rc<RefCell<Env>>,
     pub arity: u16,
     pub args: Range,
     pub body: Idx,
