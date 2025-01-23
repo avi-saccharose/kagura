@@ -1,10 +1,10 @@
 #![allow(dead_code)]
 use std::collections::HashMap;
-use std::env;
 use std::{cell::RefCell, rc::Rc};
 
 use crate::error::{ErrorType, KaguError};
 use crate::expr::{Call, Def, Return, While};
+use crate::resolver;
 use crate::values::{KaguDef, NativeDef};
 use crate::{
     expr::{Assign, Ast, Bin, Idx, If, Lit, Logical, Node, Unary, Var, VarDecl},
@@ -154,7 +154,9 @@ impl Interpreter {
         }
     }
 
+    // TODO: Move out the resolver from eval stage
     pub fn eval(&mut self, ast: &Ast) -> Result<(), KaguError> {
+        resolver::resolve(ast)?;
         let indices = ast.indices.iter();
         for idx in indices {
             self.eval_node(ast, *idx)?;
@@ -374,7 +376,7 @@ impl Interpreter {
     // INFO: handle args, env
     fn call_native(
         &mut self,
-        ast: &Ast,
+        _ast: &Ast,
         def: NativeDef,
         args: Vec<Value>,
     ) -> Result<Value, KaguError> {
