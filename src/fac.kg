@@ -1,0 +1,9 @@
+var a = 1;
+var b = 1;
+
+while(b < 20) {
+    b = b + 1;
+    a = a * b;
+}
+
+puts a;

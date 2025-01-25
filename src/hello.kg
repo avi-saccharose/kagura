@@ -1,0 +1,14 @@
+def hello(a, b) {
+	puts "hello " + a + " and " + b;
+}
+
+hello("avi", "alex");
+
+
+def add(n) {
+    if (n >= 20) return n;
+    return n + 1;
+}
+
+
+puts add(1);

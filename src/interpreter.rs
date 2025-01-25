@@ -89,6 +89,7 @@ impl Default for Env {
 pub(crate) struct Interpreter {
     pub env: Rc<RefCell<Env>>,
     ret_value: Option<Value>,
+    locals: HashMap<Idx, usize>,
 }
 
 impl Interpreter {
@@ -96,6 +97,7 @@ impl Interpreter {
         Self {
             env: Rc::new(RefCell::new(Default::default())),
             ret_value: None,
+            locals: HashMap::new(),
         }
     }
 
@@ -111,6 +113,10 @@ impl Interpreter {
             error_type: ErrorType::Runtime,
             msg: e,
         })
+    }
+
+    pub fn insert_local(&mut self, idx: Idx, depth: usize) {
+        self.locals.insert(idx, depth);
     }
 
     fn assign(&mut self, name: &str, value: Value, token: Token) -> Result<(), KaguError> {
@@ -156,7 +162,6 @@ impl Interpreter {
 
     // TODO: Move out the resolver from eval stage
     pub fn eval(&mut self, ast: &Ast) -> Result<(), KaguError> {
-        resolver::resolve(ast)?;
         let indices = ast.indices.iter();
         for idx in indices {
             self.eval_node(ast, *idx)?;

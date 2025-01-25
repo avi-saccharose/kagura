@@ -2,7 +2,7 @@
 
 use crate::token::Token;
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub(crate) struct Idx(pub usize);
 
 #[derive(Debug, Clone, PartialEq)]

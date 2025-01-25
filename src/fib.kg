@@ -1,0 +1,16 @@
+def fib(n) {
+
+      if(n <= 1) {
+      return n;
+    }
+  
+    return fib(n - 2) + fib(n - 1);
+}
+
+
+var i = 0;
+while (i <= 30) {
+  i = i + 1;
+  puts fib(i);
+}
+

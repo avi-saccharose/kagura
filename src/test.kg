@@ -1,0 +1,8 @@
+def hi() {
+    return 1;
+    return 2;
+  }
+
+  puts hi();
+
+  return 1;

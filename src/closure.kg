@@ -1,0 +1,13 @@
+def make() {
+	var i = 0;
+	def count() {
+		i = i + 1;
+		puts i;
+	}
+	return count;
+}
+
+
+var counter = make();
+counter();
+counter();
