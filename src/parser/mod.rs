@@ -4,9 +4,7 @@ use crate::{
         Lexer,
         token::{Kind, Span, Token},
     },
-    parser::ast::{
-        Assign, Bin, Call, Def, Expr, Ident, If, IfStmt, Lit, Puts, Stmt, VarDecl, VarKind,
-    },
+    parser::ast::{Assign, Bin, Call, Def, Expr, Ident, If, IfStmt, Lit, Puts, Stmt, VarDecl},
 };
 
 use std::{iter::Peekable, vec};
@@ -162,7 +160,7 @@ impl<'input> Parser<'input> {
             let name = token.text(self.input).to_string();
             Ident(name, token)
         };
-        let mut ret_kind: Option<VarKind> = None;
+        let mut ret_kind: Option<Kind> = None;
         let mut args = vec![];
         let mut body = vec![];
         self.consume(Kind::Lparen)?;
@@ -173,7 +171,7 @@ impl<'input> Parser<'input> {
                 self.consume(Kind::Colon)?;
                 let kind = {
                     let kind = self.peek();
-                    let kind = self.var_kind(kind)?;
+                    //let kind = self.var_kind(kind)?;
                     self.next();
                     kind
                 };
@@ -191,7 +189,7 @@ impl<'input> Parser<'input> {
         if self.match_kind(Kind::Arrow) {
             self.next();
             let current = self.peek();
-            ret_kind = Some(self.var_kind(current)?);
+            ret_kind = Some(current);
             self.next();
         }
         self.consume(Kind::Do)?;
@@ -209,29 +207,16 @@ impl<'input> Parser<'input> {
         }))
     }
 
-    fn var_kind(&mut self, kind: Kind) -> Result<VarKind, ParseError> {
-        match kind {
-            Kind::Int => Ok(VarKind::Int),
-            Kind::Str => Ok(VarKind::Str),
-            Kind::Bool => Ok(VarKind::Bool),
-            Kind::Const => {
-                let token = self.next().unwrap();
-                let ident = token.text(self.input);
-                Ok(VarKind::Ident(ident.to_string()))
-            }
-            kind => self.error(ParseErrorKind::InvalidKind(kind)),
-        }
-    }
     // VarStmt -> "var" ident (":" kind) = expr
     fn stmt_var(&mut self) -> Result<Stmt, ParseError> {
         self.next();
         let ident_token = self.consume(Kind::Ident)?;
         let name = ident_token.text(self.input).to_string();
-        let mut kind: Option<VarKind> = None;
+        let mut kind: Option<Kind> = None;
         if matches!(self.peek(), Kind::Colon) {
             self.next();
             let current = self.peek();
-            kind = Some(self.var_kind(current)?);
+            kind = Some(current);
             self.next();
         }
 

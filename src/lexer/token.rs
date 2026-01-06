@@ -62,7 +62,7 @@ impl fmt::Display for Token {
     }
 }
 
-#[derive(Debug, Copy, Clone, Hash, PartialEq, PartialOrd)]
+#[derive(Debug, Copy, Clone, Hash, PartialEq, PartialOrd, Eq)]
 pub enum Kind {
     Plus,
     Minus,

@@ -28,8 +28,8 @@ pub struct IfStmt {
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub struct Def {
     pub name: Ident,
-    pub ret_kind: Option<VarKind>,
-    pub args: Vec<(Expr, VarKind)>,
+    pub ret_kind: Option<Kind>,
+    pub args: Vec<(Expr, Kind)>,
     pub body: Vec<Stmt>,
     pub token: Token,
 }
@@ -41,35 +41,9 @@ pub struct Puts {
 }
 
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
-pub enum VarKind {
-    Int,
-    Str,
-    Bool,
-    Void,
-    Ident(String),
-    Undefined,
-}
-impl fmt::Display for VarKind {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                VarKind::Int => "int",
-                VarKind::Str => "str",
-                VarKind::Bool => "bool",
-                VarKind::Void => "void",
-                VarKind::Ident(ident) => &ident,
-                VarKind::Undefined => "Undefined",
-            }
-        )
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub struct VarDecl {
     pub name: String,
-    pub kind: Option<VarKind>,
+    pub kind: Option<Kind>,
     pub init: Option<Expr>,
     pub token: Token,
 }

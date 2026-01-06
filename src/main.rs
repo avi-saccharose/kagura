@@ -1,5 +1,6 @@
 use crate::parser::Parser;
 use crate::parser::printer::AstPrinter;
+mod analyzer;
 mod lexer;
 mod parser;
 fn main() {
