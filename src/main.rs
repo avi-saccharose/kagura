@@ -5,6 +5,8 @@ mod parser;
 fn main() {
     let mut parser = Parser::new(
         r#"
+        x = 1 + 1
+        var b: bool = if true then true else false + false
         var x: int 
         var i = 8
         "#,

@@ -1,8 +1,9 @@
-use crate::parser::ast::{Bin, Expr, Lit, Stmt, VarDecl};
+use crate::parser::ast::{Assign, Bin, Expr, If, Lit, Stmt, VarDecl};
 
 pub struct AstPrinter {
     indent: usize,
     output: String,
+    is_stmt: bool,
 }
 
 impl AstPrinter {
@@ -10,6 +11,7 @@ impl AstPrinter {
         Self {
             indent: 0,
             output: String::new(),
+            is_stmt: true,
         }
     }
     pub fn finish(self) -> String {
@@ -19,11 +21,12 @@ impl AstPrinter {
     fn line(&mut self, prefix: &str, is_last: bool, text: &str) {
         self.output.push_str(prefix);
 
-        if is_last {
+        if is_last && !self.is_stmt {
             self.output.push_str("└──");
-        } else {
+        } else if !self.is_stmt {
             self.output.push_str("├──");
         }
+        self.is_stmt = false;
 
         self.output.push_str(text);
         self.output.push('\n')
@@ -41,6 +44,7 @@ impl AstPrinter {
 
     pub fn print_tree(&mut self, stmts: &[Stmt]) {
         for stmt in stmts {
+            self.is_stmt = true;
             self.print_stmt(stmt, "", true);
         }
     }
@@ -77,10 +81,51 @@ impl AstPrinter {
 
     fn print_expr(&mut self, expr: &Expr, prefix: &str, is_last: bool) {
         match expr {
+            Expr::If(expr) => self.print_if(expr, prefix, is_last),
+            Expr::Assign(assign) => self.print_assign(assign, prefix, is_last),
             Expr::Bin(bin) => self.print_binary(bin, prefix, is_last),
             Expr::Lit(lit) => self.print_lit(lit, prefix, is_last),
             _ => todo!(),
         }
+    }
+
+    fn print_if(&mut self, expr: &If, prefix: &str, is_last: bool) {
+        self.line(prefix, is_last, "If");
+
+        let child_prefix = Self::child_prefix(prefix, is_last);
+
+        self.line(&child_prefix, false, "Cond");
+        self.print_expr(
+            &expr.cond,
+            &Self::child_prefix(&child_prefix, false),
+            is_last,
+        );
+
+        self.line(&child_prefix, false, "Then");
+        self.print_expr(
+            &expr.then_expr,
+            &Self::child_prefix(&child_prefix, false),
+            is_last,
+        );
+        self.line(&child_prefix, true, "Else");
+        self.print_expr(
+            &expr.else_expr,
+            &Self::child_prefix(&child_prefix, true),
+            true,
+        );
+    }
+
+    fn print_assign(&mut self, assign: &Assign, prefix: &str, is_last: bool) {
+        let ident = &assign.name;
+        self.line(prefix, is_last, &format!("Assign({ident})"));
+
+        let child_prefix = Self::child_prefix(prefix, is_last);
+        self.line(&child_prefix, true, "Value");
+        self.print_expr(
+            &assign.value,
+            &Self::child_prefix(&child_prefix, is_last),
+            true,
+        );
     }
 
     fn print_binary(&mut self, bin: &Bin, prefix: &str, is_last: bool) {

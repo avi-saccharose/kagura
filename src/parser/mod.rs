@@ -250,6 +250,7 @@ impl<'input> Parser<'input> {
     }
 
     // IFStmt -> "if" expr "then" stmt ("else" stmt) end
+    // TODO: eof error on missing "end"
     fn stmt_if(&mut self) -> Result<Stmt, ParseError> {
         let token = self.next().unwrap();
         let cond = self.expr()?;
