@@ -88,8 +88,8 @@ impl<'input> Lexer<'input> {
             '/' => Kind::Slash,
             ':' => Kind::Colon,
             //  ';' => Kind::Semicolon,
-            //  '{' => Kind::Lbrace,
-            // '}' => Kind::Rbrace,
+            '{' => Kind::Lbrace,
+            '}' => Kind::Rbrace,
             '(' => Kind::Lparen,
             ')' => Kind::Rparen,
             '-' => {

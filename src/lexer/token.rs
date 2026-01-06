@@ -87,8 +87,8 @@ pub enum Kind {
 
     Lparen,
     Rparen,
-    //    Lbrace,
-    //   Rbrace,
+    Lbrace,
+    Rbrace,
     Lblock,
     Rblock,
 
@@ -148,8 +148,8 @@ impl fmt::Display for Kind {
 
             Self::Lparen => "(",
             Self::Rparen => ")",
-            //  Self::Lbrace => "{",
-            //  Self::Rbrace => "}",
+            Self::Lbrace => "{",
+            Self::Rbrace => "}",
             Self::Lblock => "[",
             Self::Rblock => "]",
 

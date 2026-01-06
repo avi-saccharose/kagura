@@ -4,13 +4,16 @@ use crate::{
         Lexer,
         token::{Kind, Span, Token},
     },
-    parser::ast::{Assign, Bin, Call, Def, Expr, Ident, If, IfStmt, Lit, Puts, Stmt, Var, VarKind},
+    parser::ast::{
+        Assign, Bin, Call, Def, Expr, Ident, If, IfStmt, Lit, Puts, Stmt, VarDecl, VarKind,
+    },
 };
 
 use std::{iter::Peekable, vec};
 use thiserror::Error;
 
 pub mod ast;
+pub mod printer;
 
 #[derive(Debug, Clone, Error)]
 #[error("error on line {line}: {kind}")]
@@ -238,7 +241,7 @@ impl<'input> Parser<'input> {
             init = Some(self.expr()?);
         }
 
-        Ok(Stmt::Var(Var {
+        Ok(Stmt::VarDecl(VarDecl {
             kind,
             name,
             init,
@@ -520,7 +523,7 @@ mod tests {
     fn parse_var_expr() {
         let mut parser = Parser::new(r#"var x: int = 1 + 1"#);
         let stmts = parser.parse().unwrap();
-        assert!(matches!(stmts[0], Stmt::Var(Var { .. })))
+        assert!(matches!(stmts[0], Stmt::VarDecl(VarDecl { .. })))
     }
 
     #[test]

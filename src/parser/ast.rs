@@ -9,7 +9,7 @@ pub enum Stmt {
     Def(Def),
     Puts(Puts),
     Expr(Expr),
-    Var(Var),
+    VarDecl(VarDecl),
 }
 
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
@@ -49,9 +49,25 @@ pub enum VarKind {
     Ident(String),
     Undefined,
 }
+impl fmt::Display for VarKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                VarKind::Int => "int",
+                VarKind::Str => "str",
+                VarKind::Bool => "bool",
+                VarKind::Void => "void",
+                VarKind::Ident(ident) => &ident,
+                VarKind::Undefined => "Undefined",
+            }
+        )
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
-pub struct Var {
+pub struct VarDecl {
     pub name: String,
     pub kind: Option<VarKind>,
     pub init: Option<Expr>,
