@@ -11,7 +11,6 @@ use std::{iter::Peekable, vec};
 use thiserror::Error;
 
 pub mod ast;
-pub mod printer;
 
 #[derive(Debug, Clone, Error)]
 #[error("error on line {line}: {kind}")]

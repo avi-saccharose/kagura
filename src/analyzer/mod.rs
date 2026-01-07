@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt};
 
 use thiserror::Error;
 
@@ -21,6 +21,23 @@ pub enum Ty {
     Void,
 }
 
+impl fmt::Display for Ty {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Ty::Int => "int",
+                Ty::Float => "float",
+                Ty::Bool => "bool",
+                Ty::String => "string",
+                Ty::Bool => "bool",
+                Ty::Void => "void",
+            }
+        )
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Hash, Eq)]
 pub enum Op {
     Add,
@@ -35,6 +52,39 @@ pub enum Op {
     GtEq,
     EqEq,
     Not,
+}
+impl fmt::Display for Op {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Self::Add => "+",
+                Self::Mul => "*",
+                Self::Sub => "-",
+                Self::Div => "/",
+                _ => todo!(),
+            }
+        )
+    }
+}
+impl From<Kind> for Op {
+    fn from(op: Kind) -> Op {
+        match op {
+            Kind::Plus => Op::Add,
+            Kind::Minus => Op::Sub,
+            Kind::Slash => Op::Div,
+            Kind::Star => Op::Mul,
+            Kind::Lt => Op::Lt,
+            Kind::LtEq => Op::LtEQ,
+            Kind::Gt => Op::Gt,
+            Kind::GtEq => Op::GtEq,
+            Kind::EqEq => Op::EqEq,
+            Kind::NtEq => Op::NtEq,
+            Kind::Bang => Op::Not,
+            _ => unreachable!(),
+        }
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash, Eq)]
@@ -165,18 +215,18 @@ impl TypeChecker {
         let left = self.check_expr(*bin.left)?;
         let right = self.check_expr(*bin.right)?;
         let result_type = self.check_binary_op(bin.op, left.ty, right.ty)?;
-        let op = self.check_op(bin.op);
         Ok(TExpr {
             expr: TExprKind::Bin(TBin {
                 left: Box::new(left),
                 right: Box::new(right),
-                op,
+                op: bin.op.into(),
             }),
             ty: result_type,
         })
     }
 
     fn check_lit(&mut self, lit: Lit) -> Result<TExpr, TypeError> {
+        dbg!(&lit);
         let (ty, lit) = match lit {
             Lit::Int(val, token) => (Ty::Int, TLit::Int(val, token)),
             Lit::Bool(val, token) => (Ty::Bool, TLit::Bool(val, token)),
@@ -192,26 +242,10 @@ impl TypeChecker {
 
     fn check_binary_op(&self, op: Kind, left: Ty, right: Ty) -> Result<Ty, TypeError> {
         let key = BinRule { op, left, right };
+        dbg!(&key);
         self.bin_rules
             .get(&key)
             .copied()
-            .ok_or_else(|| TypeError::Error("invalid operand".to_string()))
-    }
-
-    fn check_op(&self, op: Kind) -> Op {
-        match op {
-            Kind::Plus => Op::Add,
-            Kind::Minus => Op::Sub,
-            Kind::Slash => Op::Div,
-            Kind::Star => Op::Mul,
-            Kind::Lt => Op::Lt,
-            Kind::LtEq => Op::LtEQ,
-            Kind::Gt => Op::Gt,
-            Kind::GtEq => Op::GtEq,
-            Kind::EqEq => Op::EqEq,
-            Kind::NtEq => Op::NtEq,
-            Kind::Bang => Op::Not,
-            _ => unreachable!(),
-        }
+            .ok_or_else(|| TypeError::Error(format!("invalid operand {}", op)))
     }
 }
