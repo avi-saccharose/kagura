@@ -82,7 +82,7 @@ pub struct Bin {
 
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub struct Unary {
-    pub left: Box<Expr>,
+    pub right: Box<Expr>,
     pub op: Kind,
     pub token: Token,
 }

@@ -4,7 +4,9 @@ use crate::{
         Lexer,
         token::{Kind, Span, Token},
     },
-    parser::ast::{Assign, Bin, Call, Def, Expr, Ident, If, IfStmt, Lit, Puts, Stmt, VarDecl},
+    parser::ast::{
+        Assign, Bin, Call, Def, Expr, Ident, If, IfStmt, Lit, Puts, Stmt, Unary, VarDecl,
+    },
 };
 
 use std::{iter::Peekable, vec};
@@ -267,32 +269,15 @@ impl<'input> Parser<'input> {
     }
 
     fn expr(&mut self) -> Result<Expr, ParseError> {
-        match self.peek() {
-            Kind::If => self.expr_if(),
-            _ => self.assignment(),
-        }
-    }
-
-    fn expr_if(&mut self) -> Result<Expr, ParseError> {
-        self.next();
-        let cond = self.expr()?;
-        self.consume(Kind::Then)?;
-        let then_expr = self.expr()?;
-        self.consume(Kind::Else)?;
-        let else_expr = self.expr()?;
-        Ok(Expr::If(If {
-            cond: Box::new(cond),
-            then_expr: Box::new(then_expr),
-            else_expr: Box::new(else_expr),
-        }))
+        self.assignment()
     }
 
     fn assignment(&mut self) -> Result<Expr, ParseError> {
-        let expr = self.and()?;
+        let expr = self.expr_if()?;
 
         if matches!(self.peek(), Kind::Eq) {
             self.next();
-            let value = self.and()?;
+            let value = self.assignment()?;
             match expr {
                 Expr::Ident(token) => {
                     return Ok(Expr::Assign(Assign {
@@ -304,6 +289,23 @@ impl<'input> Parser<'input> {
             }
         }
         Ok(expr)
+    }
+
+    fn expr_if(&mut self) -> Result<Expr, ParseError> {
+        if matches!(self.peek(), Kind::If) {
+            self.next();
+            let cond = self.expr()?;
+            self.consume(Kind::Then)?;
+            let then_expr = self.expr()?;
+            self.consume(Kind::Else)?;
+            let else_expr = self.expr()?;
+            return Ok(Expr::If(If {
+                cond: Box::new(cond),
+                then_expr: Box::new(then_expr),
+                else_expr: Box::new(else_expr),
+            }));
+        }
+        self.and()
     }
 
     fn and(&mut self) -> Result<Expr, ParseError> {
@@ -396,8 +398,16 @@ impl<'input> Parser<'input> {
         Ok(left)
     }
 
-    // TODO:
     fn unary(&mut self) -> Result<Expr, ParseError> {
+        if matches!(self.peek(), Kind::Bang | Kind::Minus) {
+            let op = self.next().unwrap();
+            let right = self.unary()?;
+            return Ok(Expr::Unary(Unary {
+                op: op.kind,
+                right: Box::new(right),
+                token: op,
+            }));
+        }
         self.call()
     }
 
@@ -495,6 +505,13 @@ mod tests {
         let mut parser = Parser::new(r#"1 + 2"#);
         let stmts = parser.parse().unwrap();
         assert!(matches!(stmts[0], Stmt::Expr(Expr::Bin(Bin { .. }))))
+    }
+
+    #[test]
+    fn parse_unary() {
+        let mut parser = Parser::new(r#"!true"#);
+        let stmts = parser.parse().unwrap();
+        assert!(matches!(stmts[0], Stmt::Expr(Expr::Unary(Unary { .. }))))
     }
 
     #[test]
