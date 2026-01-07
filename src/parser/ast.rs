@@ -99,7 +99,7 @@ pub struct Ident(pub String, pub Token);
 
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub enum Lit {
-    Int(u64, Token),
+    Int(i64, Token),
     Float(f64, Token),
     Bool(bool, Token),
     Str(String, Token),

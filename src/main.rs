@@ -1,8 +1,10 @@
+use crate::analyzer::TypeChecker;
 use crate::parser::Parser;
-use crate::parser::printer::AstPrinter;
+use crate::printer::AstPrinter;
 mod analyzer;
 mod lexer;
 mod parser;
+mod printer;
 fn main() {
     let mut parser = Parser::new(
         r#"
@@ -16,4 +18,19 @@ fn main() {
     let mut printer = AstPrinter::new();
     printer.print_tree(&ast);
     println!("{}", printer.finish());
+
+    let mut type_checker = TypeChecker::new();
+    let checked_ast = type_checker.check_program(
+        Parser::new(
+            "
+1 + true",
+        )
+        .parse()
+        .unwrap(),
+    );
+
+    match checked_ast {
+        Ok(ast) => println!("{}", AstPrinter::new().print_tree(ast).finish()),
+        Err(e) => dbg!(e),
+    };
 }
